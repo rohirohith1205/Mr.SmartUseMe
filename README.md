@@ -1,18 +1,48 @@
-# Mr.SmartUseMe
+**MR.SmartUSEME**
+AI-Powered Smart Waste Classification System
 
+MR.SmartUSEME is a real-time smart waste classification system powered by a custom-trained YOLOv8 object detection model. The system continuously processes live webcam input and detects waste items, classifying them into predefined waste categories.
 
-**Overview**
-MR.SmartUSEME is an AI-powered smart waste segregation system that uses a camera-mounted smart bin and a YOLO-based deep learning model to classify trash in real time.
-The system detects different types of waste (e.g., plastic, paper, metal, organic, etc.) and determines the appropriate disposal category automatically.
-This project aims to improve recycling efficiency, reduce human intervention, and support sustainable waste management in smart cities.
+**Features**
+Continuous live webcam feed
+Real-time object detection using YOLOv8
+Bounding box visualization with confidence score
+Waste type classification (Recyclable, Organic, E-Waste, Trash)
+CPU-friendly real-time inference
+Desktop-based prototype implementation
 
-**Problem statement**
-Manual waste segregation is:
-Time-consuming
-Prone to human error
-Inefficient in large-scale environments
+**Model Details**
+Model: YOLOv8 (Ultralytics)
+Dataset: TACO (Trash Annotations in Context)
+Trained Model: best.pt
+Inference Engine: Ultralytics + OpenCV
 
-Improper waste disposal leads to:
-Recycling contamination
-Environmental pollution
-Increased landfill waste
+**Technology Stack**
+Python
+OpenCV
+Ultralytics YOLOv8
+Flask (for backend API mode)
+JavaScript (for browser-based frontend, if applicable)
+
+**Installation and Setup**
+1. Install dependencies
+pip install -r requirements.txt
+
+3. Start backend (if using API mode)
+python app.py
+
+5. Start frontend
+Using Node:
+npx live-server
+Or using Python:
+python -m http.server
+
+**Objective**
+
+The objective of this project is to develop an intelligent automated waste classification system that supports smart recycling initiatives and promotes environmental sustainability using computer vision and deep learning.
+
+**Current Version**
+Continuous real-time detection
+Live bounding box overlay
+Confidence scoring
+Future upgrades may include a human feedback loop and model fine-tuning pipeline.
