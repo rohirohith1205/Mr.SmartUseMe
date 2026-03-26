@@ -15,16 +15,16 @@ import os
 import sys
 
 # ── Load model ──────────────────────────────────────────────────
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "best.pt")
+MMODEL_PATH = os.path.join(os.path.dirname(__file__), "best.pt")
 
-if not os.path.exists(MODEL_PATH):
-    print(f"[ERROR] Model not found at: {MODEL_PATH}")
-    sys.exit(1)
+if os.path.exists(MMODEL_PATH):
+    print(f"[INFO] Loading YOLO model from {MODEL_PATH} ...")
+    model = YOLO(MODEL_PATH)
+else:
+    print("[WARNING] best.pt not found. Using yolov8n.pt instead...")
+    model = YOLO("yolov8n.pt")
 
-print(f"[INFO] Loading YOLO model from {MODEL_PATH} ...")
-model = YOLO(MODEL_PATH)
 print(f"[INFO] Model loaded. Classes: {list(model.names.values())}")
-
 # ── Flask app ────────────────────────────────────────────────────
 app = Flask(__name__)
 CORS(app)   # Allow requests from the browser (localhost HTML file)
