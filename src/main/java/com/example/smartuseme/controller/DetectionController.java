@@ -1,6 +1,6 @@
-package com.smartuseme.controller;
+package com.example.smartuseme.controller;
 
-import com.smartuseme.service.DetectionService;
+import com.example.smartuseme.service.DetectionService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 

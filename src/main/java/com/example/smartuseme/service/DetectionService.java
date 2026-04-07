@@ -1,4 +1,4 @@
-package com.smartuseme.service;
+package com.example.smartuseme.service;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
