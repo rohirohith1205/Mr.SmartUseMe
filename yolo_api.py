@@ -12,12 +12,11 @@ from flask_cors import CORS
 import cv2
 import numpy as np
 import os
-import sys
 
 # ── Load model ──────────────────────────────────────────────────
-MMODEL_PATH = os.path.join(os.path.dirname(__file__), "best.pt")
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "best.pt")
 
-if os.path.exists(MMODEL_PATH):
+if os.path.exists(MODEL_PATH):
     print(f"[INFO] Loading YOLO model from {MODEL_PATH} ...")
     model = YOLO(MODEL_PATH)
 else:
@@ -25,9 +24,10 @@ else:
     model = YOLO("yolov8n.pt")
 
 print(f"[INFO] Model loaded. Classes: {list(model.names.values())}")
+
 # ── Flask app ────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app)   # Allow requests from the browser (localhost HTML file)
+CORS(app)
 
 CONFIDENCE_THRESHOLD = 0.4
 MAX_DETECTIONS = 10
@@ -37,7 +37,7 @@ MAX_DETECTIONS = 10
 def health():
     return jsonify({
         "status": "ok",
-        "model": "best.pt",
+        "model": os.path.basename(MODEL_PATH),
         "classes": list(model.names.values()),
         "confidence_threshold": CONFIDENCE_THRESHOLD
     })
@@ -45,7 +45,6 @@ def health():
 # ── Prediction endpoint ──────────────────────────────────────────
 @app.route("/predict", methods=["POST"])
 def predict():
-    # Validate request
     if "frame" not in request.files:
         return jsonify({"error": "No frame provided"}), 400
 
@@ -56,35 +55,40 @@ def predict():
 
         if img is None:
             return jsonify({"error": "Could not decode image"}), 400
-
     except Exception as e:
         return jsonify({"error": f"Image decoding failed: {str(e)}"}), 400
 
-    # Run inference
     try:
         results = model(img, conf=CONFIDENCE_THRESHOLD, verbose=False)
     except Exception as e:
         return jsonify({"error": f"Inference failed: {str(e)}"}), 500
 
-    # Parse detections — sorted by confidence (highest first)
     detections = []
     boxes = results[0].boxes
 
     if boxes is not None and len(boxes) > 0:
-        # Sort by confidence descending
         confs = boxes.conf.tolist()
-        sorted_indices = sorted(range(len(confs)), key=lambda i: confs[i], reverse=True)
+        sorted_indices = sorted(
+            range(len(confs)),
+            key=lambda i: confs[i],
+            reverse=True
+        )
 
         for idx in sorted_indices[:MAX_DETECTIONS]:
-            cls   = int(boxes.cls[idx])
+            cls = int(boxes.cls[idx])
             label = model.names[cls]
-            conf  = float(boxes.conf[idx])
+            conf = float(boxes.conf[idx])
             x1, y1, x2, y2 = boxes.xyxy[idx].tolist()
 
             detections.append({
-                "class":      label,
+                "class": label,
                 "confidence": round(conf, 4),
-                "bbox":       [round(x1), round(y1), round(x2 - x1), round(y2 - y1)]
+                "bbox": [
+                    round(x1),
+                    round(y1),
+                    round(x2 - x1),
+                    round(y2 - y1)
+                ]
             })
 
     return jsonify(detections)
@@ -94,5 +98,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n[INFO] MR.SmartUSEME API running at http://localhost:{port}")
     print(f"[INFO] Health check: http://localhost:{port}/")
-    print(f"[INFO] Open index.html in your browser to start detection.\n")
+    print("[INFO] Open index.html in your browser to start detection.\n")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
