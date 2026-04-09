@@ -18,4 +18,16 @@ public class DetectionController {
     public String detect(@RequestParam("file") MultipartFile file) throws Exception {
         return detectionService.detectGarbage(file);
     }
+
+    @GetMapping("/health")
+public String health() {
+    return "SmartUSEME backend running";
+    }
+
+    @GetMapping("/python-health")
+public String pythonHealth() {
+    return detectionService.checkPythonHealth();
+    }
+
 }
+

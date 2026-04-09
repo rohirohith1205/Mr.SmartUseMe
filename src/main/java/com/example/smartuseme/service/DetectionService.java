@@ -33,4 +33,12 @@ public class DetectionService {
                 .bodyToMono(String.class)
                 .block();
     }
+
+    public String checkPythonHealth() {
+    return webClient.get()
+            .uri("/")
+            .retrieve()
+            .bodyToMono(String.class)
+            .block();
+}
 }
