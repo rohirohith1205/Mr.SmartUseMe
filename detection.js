@@ -1,7 +1,7 @@
 // detection.js — YOLOv8 object detection for MR.SmartUSEME
 // Backend: yolo_api.py (Flask) running at localhost:5000
 
-const API_URL = "http://localhost:5000/predict";
+const API_URL = "http://localhost:8000/api/predict";
 const CONFIDENCE_THRESHOLD = 0.35;
 
 // ── Waste Type Mapping — matches best.pt model classes exactly ──
@@ -288,9 +288,14 @@ function renderPrediction(bbox, score, className) {
     // Only dispatch event once per new class (avoids flooding history)
     if (className !== lastDispatchedClass) {
         lastDispatchedClass = className;
-        window.dispatchEvent(new CustomEvent('wasteDetected', {
-            detail: { className, type: info.type, percent, action: info.action }
-        }));
+       window.dispatchEvent(new CustomEvent("wasteDetected", {
+    detail: {
+        className: className,
+        type: info.type,
+        percent: score,
+        action: info.action
+    }
+    }));
     }
 }
 
