@@ -1,7 +1,7 @@
 // detection.js — YOLOv8 object detection for MR.SmartUSEME
 // Backend: yolo_api.py (Flask) running at localhost:5000
 
-const API_URL = "http://localhost:8080/api/detect";
+const API_URL = "http://localhost:5000/predict";
 const CONFIDENCE_THRESHOLD = 0.35;
 
 // ── Waste Type Mapping — matches best.pt model classes exactly ──
@@ -100,7 +100,7 @@ async function init() {
 // ── Backend Health Check ──────────────────────────────────────
 async function checkBackend() {
     try {
-        const res = await fetch("http://localhost:8080/api/health", {
+        const res = await fetch("http://localhost:5000/", {
             method: "GET",
             signal: AbortSignal.timeout(3000)
         });
@@ -210,7 +210,7 @@ async function detectFrame() {
 
         try {
             const formData = new FormData();
-            formData.append('file', blob, 'frame.jpg');
+            formData.append('frame', blob, 'frame.jpg');
 
             const res = await fetch(API_URL, {
                 method: 'POST',
