@@ -40,8 +40,55 @@ let lastFpsTime = performance.now();
 let streamRef = null;
 let isCameraRunning = false;
 
+// ── GPS State ─────────────────────────────────────────
+let currentGPSLocation = null;
+let gpsPermissionDenied = false;
+
+function captureGPS() {
+    if (gpsPermissionDenied) return; // Don't keep asking if user denied
+    
+    if (!navigator.geolocation) {
+        gpsPermissionDenied = true;
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            currentGPSLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: position.timestamp
+            };
+        },
+        (error) => {
+            if (error.code === error.PERMISSION_DENIED) {
+                gpsPermissionDenied = true;
+            }
+            currentGPSLocation = null;
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+}
+
+// Start capturing GPS every second while detection is active
+let gpsUpdateInterval = null;
+
+function startGPSTracking() {
+    if (gpsUpdateInterval) return;
+    captureGPS(); // Capture immediately
+    gpsUpdateInterval = setInterval(captureGPS, 1000);
+}
+
+function stopGPSTracking() {
+    if (gpsUpdateInterval) {
+        clearInterval(gpsUpdateInterval);
+        gpsUpdateInterval = null;
+    }
+}
+
 // ── Object Tracking (Deduplication) ───────────────────
-let trackedObjects = []; // [{ className, bboxCenter, lastSeen, id, countedAsNew }]
+let trackedObjects = []; // [{ className, bboxCenter, lastSeen, id, countedAsNew, gpsLocation }]
 const TRACKING_TIMEOUT = 2000; // ms - forget item if not seen for 2 sec
 const MATCH_THRESHOLD = 60; // px - distance threshold for same object
 
@@ -91,13 +138,14 @@ function trackDetection(className, bbox) {
         existing.bboxCenter = bboxCenter;
         return existing; // Return the tracked object
     } else {
-        // New object detected
+        // New object detected - capture GPS at this moment
         const newTrack = {
             className,
             bboxCenter,
             id: objectId,
             lastSeen: Date.now(),
-            countedAsNew: false // Will be set to true when we dispatch event
+            countedAsNew: false,
+            gpsLocation: currentGPSLocation ? { ...currentGPSLocation } : null
         };
         trackedObjects.push(newTrack);
         return newTrack; // Return the new tracked object
@@ -138,10 +186,15 @@ async function startDetection() {
         }
 
         backendOK = true;
+        startGPSTracking(); // Start capturing GPS
         updateStatus("Scanning...");
         detItemName.innerText = "Scanning...";
         detItemType.innerText = "YOLO Active";
         startFpsCounter();
+        
+        // Dispatch detection session start event
+        window.dispatchEvent(new Event("detectionSessionStart"));
+        
         detectFrame();
     } catch (err) {
         console.error(err);
@@ -159,8 +212,10 @@ function stopCamera() {
     isCameraRunning = false;
     backendOK = false;
     
-    // Clear tracked objects
+    // Stop GPS tracking and clear tracked objects
+    stopGPSTracking();
     trackedObjects = [];
+    currentGPSLocation = null;
 
     if (fpsInterval) {
         clearInterval(fpsInterval);
@@ -271,7 +326,8 @@ function renderPrediction(bbox, score, className, isNewDetection, trackedObj) {
                 type: info.type,
                 percent: percent,
                 action: info.action,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                gpsLocation: trackedObj.gpsLocation || null
             }
         }));
     }
