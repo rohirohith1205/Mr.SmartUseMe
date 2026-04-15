@@ -18,10 +18,12 @@
     body {
       font-family: 'Inter', sans-serif;
       background: linear-gradient(135deg, #0f172a 0%, #1a1f3a 50%, #0f1729 100%);
+      color: #e2e8f0;
     }
 
     body.light-mode {
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%);
+      background: linear-gradient(135deg, #faf7f2 0%, #f5f0e8 50%, #faf7f2 100%);
+      color: #5a4f47;
     }
 
     .glass-panel {
@@ -31,8 +33,9 @@
     }
 
     body.light-mode .glass-panel {
-      background: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(0, 0, 0, 0.1);
+      background: rgba(255, 252, 248, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(186, 176, 168, 0.25);
     }
 
     .gradient-text {
@@ -53,6 +56,10 @@
     .card-hover:hover {
       transform: translateY(-8px);
       box-shadow: 0 20px 40px rgba(0, 255, 157, 0.15);
+    }
+
+    body.light-mode .card-hover:hover {
+      box-shadow: 0 20px 40px rgba(109, 184, 159, 0.2);
     }
 
     .btn-primary {
@@ -77,6 +84,26 @@
     .btn-secondary:hover {
       background: rgba(229, 231, 235, 0.15);
       border-color: rgba(148, 163, 184, 0.5);
+    }
+
+    body.light-mode .btn-primary {
+      background: linear-gradient(135deg, #6db89f 0%, #7ec69f 100%);
+      color: #faf7f2;
+    }
+
+    body.light-mode .btn-primary:hover {
+      box-shadow: 0 10px 25px rgba(109, 184, 159, 0.25);
+    }
+
+    body.light-mode .btn-secondary {
+      background: rgba(113, 103, 97, 0.08);
+      border: 1px solid rgba(113, 103, 97, 0.2);
+      color: #5a4f47;
+    }
+
+    body.light-mode .btn-secondary:hover {
+      background: rgba(113, 103, 97, 0.12);
+      border-color: rgba(113, 103, 97, 0.35);
     }
 
     .pulsing-dot {
@@ -155,6 +182,95 @@
 
     body.light-mode ::-webkit-scrollbar-thumb {
       background: rgba(0, 255, 157, 0.5);
+    }
+
+    body.light-mode ::-webkit-scrollbar-thumb:hover {
+      background: rgba(109, 184, 159, 0.7);
+    }
+
+    /* Light mode text colors */
+    body.light-mode .text-slate-400 {
+      color: #8b8178;
+    }
+
+    body.light-mode .text-slate-500 {
+      color: #a49080;
+    }
+
+    body.light-mode .text-slate-100 {
+      color: #4a4238;
+    }
+
+    body.light-mode h1,
+    body.light-mode h2,
+    body.light-mode h3,
+    body.light-mode .text-slate-100 {
+      color: #3d3530;
+    }
+
+    /* Light mode backgrounds for colored cards */
+    body.light-mode .bg-emerald-500\/20 {
+      background-color: rgba(109, 184, 159, 0.12) !important;
+    }
+
+    body.light-mode .bg-red-500\/20 {
+      background-color: rgba(220, 90, 90, 0.12) !important;
+    }
+
+    body.light-mode .bg-slate-500\/20 {
+      background-color: rgba(140, 130, 115, 0.12) !important;
+    }
+
+    body.light-mode .bg-amber-500\/20 {
+      background-color: rgba(200, 140, 60, 0.12) !important;
+    }
+
+    body.light-mode .bg-blue-500\/20 {
+      background-color: rgba(100, 150, 200, 0.12) !important;
+    }
+
+    /* Light mode borders */
+    body.light-mode .border-slate-700\/50 {
+      border-color: rgba(186, 176, 168, 0.3) !important;
+    }
+
+    body.light-mode .border-emerald-500\/30 {
+      border-color: rgba(109, 184, 159, 0.35) !important;
+    }
+
+    body.light-mode .border-red-500\/30 {
+      border-color: rgba(220, 90, 90, 0.35) !important;
+    }
+
+    body.light-mode .border-slate-500\/30 {
+      border-color: rgba(140, 130, 115, 0.35) !important;
+    }
+
+    body.light-mode .text-emerald-400 {
+      color: #6db89f;
+    }
+
+    body.light-mode .text-red-400 {
+      color: #d45050;
+    }
+
+    body.light-mode .text-blue-400 {
+      color: #7ba8c4;
+    }
+
+    /* Light mode detection box styling */
+    body.light-mode #detection-box {
+      border-color: #6db89f !important;
+      box-shadow: 0 0 20px rgba(109, 184, 159, 0.4) !important;
+    }
+
+    body.light-mode #detection-label {
+      color: #6db89f !important;
+    }
+
+    /* Light mode chart text colors */
+    body.light-mode canvas {
+      filter: brightness(0.95);
     }
   </style>
 </head>
