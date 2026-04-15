@@ -1,42 +1,27 @@
-// detection.js — YOLOv8 object detection for MR.SmartUSEME
-// Backend: yolo_api.py (Flask) running at localhost:5000
-
 const API_URL = "http://localhost:5000/predict";
 const CONFIDENCE_THRESHOLD = 0.35;
 
-// ── Waste Type Mapping — matches best.pt model classes exactly ──
-// Classes: Aluminium foil, Bottle cap, Bottle, Broken glass, Can,
-// Carton, Cigarette, Cup, Lid, Other litter, Other plastic, Paper,
-// Plastic bag - wrapper, Plastic container, Pop tab, Straw,
-// Styrofoam piece, Unlabeled litter
 window.WASTE_TYPES = {
-    // Recyclable metals
     'Aluminium foil': { type: 'Recyclable', action: 'Metal Recycling', color: '#00ff9d' },
     'Bottle cap': { type: 'Recyclable', action: 'Metal Recycling', color: '#00ff9d' },
     'Can': { type: 'Recyclable', action: 'Metal Recycling', color: '#00ff9d' },
     'Pop tab': { type: 'Recyclable', action: 'Metal Recycling', color: '#00ff9d' },
-    // Hazardous glass
     'Broken glass': { type: 'Hazardous', action: 'Glass Waste Bin', color: '#ef4444' },
-    // Recyclable plastics & containers
     'Bottle': { type: 'Recyclable', action: 'Plastic Recycling', color: '#00ff9d' },
     'Cup': { type: 'Recyclable', action: 'Plastic Recycling', color: '#00ff9d' },
     'Lid': { type: 'Recyclable', action: 'Plastic Recycling', color: '#00ff9d' },
     'Other plastic': { type: 'Recyclable', action: 'Plastic Recycling', color: '#00ff9d' },
     'Plastic container': { type: 'Recyclable', action: 'Plastic Recycling', color: '#00ff9d' },
-    // General trash (non-recyclable plastics)
     'Plastic bag - wrapper': { type: 'Trash', action: 'General Waste', color: '#6b7280' },
     'Straw': { type: 'Trash', action: 'General Waste', color: '#6b7280' },
     'Styrofoam piece': { type: 'Trash', action: 'General Waste', color: '#6b7280' },
-    // Paper & cardboard
     'Carton': { type: 'Recyclable', action: 'Paper Recycling', color: '#00ff9d' },
     'Paper': { type: 'Recyclable', action: 'Paper Recycling', color: '#00ff9d' },
-    // Hazardous / unclassified
     'Cigarette': { type: 'Hazardous', action: 'Hazardous Waste', color: '#f59e0b' },
     'Other litter': { type: 'Trash', action: 'General Waste', color: '#6b7280' },
     'Unlabeled litter': { type: 'Trash', action: 'General Waste', color: '#6b7280' },
 };
 
-// ── DOM Elements ──────────────────────────────────────────────
 const video = document.getElementById('live-video');
 const detectionBox = document.getElementById('detection-box');
 const detectionLabel = document.getElementById('detection-label');
@@ -48,219 +33,261 @@ const detStatus = document.getElementById('det-status');
 const detAction = document.getElementById('det-action');
 const statSpeed = document.getElementById('stat-speed');
 
-// ── State ─────────────────────────────────────────────────────
-let lastDispatchedClass = null;
-let isDetecting = false;
 let backendOK = false;
-let consecutiveErrors = 0;
 let fpsInterval = null;
 let frameCount = 0;
 let lastFpsTime = performance.now();
+let streamRef = null;
+let isCameraRunning = false;
 
-// ── Initialization ────────────────────────────────────────────
-async function init() {
-    updateStatus('Initializing...');
-    detItemName.innerText = 'Starting camera...';
+// ── GPS State ─────────────────────────────────────────
+let currentGPSLocation = null;
+let gpsPermissionDenied = false;
 
-    // 1. Start camera
-    try {
-        await setupCamera();
-    } catch (e) {
-        detItemName.innerText = 'Camera Error';
-        detItemType.innerText = 'Check browser permissions';
-        updateStatus('Camera Failed');
-        console.error('[Detection] Camera setup failed:', e);
+function captureGPS() {
+    if (gpsPermissionDenied) return; // Don't keep asking if user denied
+    
+    if (!navigator.geolocation) {
+        gpsPermissionDenied = true;
         return;
     }
-
-    // 2. Check backend health
-    updateStatus('Checking AI backend...');
-    detItemName.innerText = 'Connecting to AI...';
-
-    const available = await checkBackend();
-    if (!available) {
-        detItemName.innerText = 'Backend Offline';
-        detItemType.innerText = 'Run: python yolo_api.py';
-        updateStatus('Backend Error');
-        showBackendOfflineError();
-        // Keep retrying in the background
-        waitForBackend();
-        return;
-    }
-
-    // 3. Start detection loop
-    backendOK = true;
-    updateStatus('Model Ready');
-    detItemName.innerText = 'Scanning...';
-    detItemType.innerText = 'YOLOv8 Active';
-    startFpsCounter();
-    detectFrame();
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            currentGPSLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: position.timestamp
+            };
+        },
+        (error) => {
+            if (error.code === error.PERMISSION_DENIED) {
+                gpsPermissionDenied = true;
+            }
+            currentGPSLocation = null;
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
 }
 
-// ── Backend Health Check ──────────────────────────────────────
+// Start capturing GPS every second while detection is active
+let gpsUpdateInterval = null;
+
+function startGPSTracking() {
+    if (gpsUpdateInterval) return;
+    captureGPS(); // Capture immediately
+    gpsUpdateInterval = setInterval(captureGPS, 1000);
+}
+
+function stopGPSTracking() {
+    if (gpsUpdateInterval) {
+        clearInterval(gpsUpdateInterval);
+        gpsUpdateInterval = null;
+    }
+}
+
+// ── Object Tracking (Deduplication) ───────────────────
+let trackedObjects = []; // [{ className, bboxCenter, lastSeen, id, countedAsNew, gpsLocation }]
+const TRACKING_TIMEOUT = 2000; // ms - forget item if not seen for 2 sec
+const MATCH_THRESHOLD = 60; // px - distance threshold for same object
+
+function generateObjectId(className, bboxCenter) {
+    return `${className}_${Math.round(bboxCenter.x / 20)}_${Math.round(bboxCenter.y / 20)}`;
+}
+
+function getBboxCenter(bbox) {
+    const [x, y, w, h] = bbox;
+    return { x: x + w / 2, y: y + h / 2 };
+}
+
+function distance(p1, p2) {
+    return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+}
+
+function findMatchingTrackedObject(className, bboxCenter) {
+    // Check if this detection matches any recently tracked object of same class
+    for (let obj of trackedObjects) {
+        if (obj.className === className) {
+            const dist = distance(obj.bboxCenter, bboxCenter);
+            if (dist < MATCH_THRESHOLD) {
+                return obj;
+            }
+        }
+    }
+    return null;
+}
+
+function cleanupOldTracks() {
+    const now = Date.now();
+    trackedObjects = trackedObjects.filter(obj => {
+        return (now - obj.lastSeen) < TRACKING_TIMEOUT;
+    });
+}
+
+function trackDetection(className, bbox) {
+    const bboxCenter = getBboxCenter(bbox);
+    const objectId = generateObjectId(className, bboxCenter);
+    
+    // Check if this is a known object
+    let existing = findMatchingTrackedObject(className, bboxCenter);
+    
+    if (existing) {
+        // Update existing track
+        existing.lastSeen = Date.now();
+        existing.bboxCenter = bboxCenter;
+        return existing; // Return the tracked object
+    } else {
+        // New object detected - capture GPS at this moment
+        const newTrack = {
+            className,
+            bboxCenter,
+            id: objectId,
+            lastSeen: Date.now(),
+            countedAsNew: false,
+            gpsLocation: currentGPSLocation ? { ...currentGPSLocation } : null
+        };
+        trackedObjects.push(newTrack);
+        return newTrack; // Return the new tracked object
+    }
+}
+
+async function setupCamera() {
+    streamRef = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+    });
+
+    video.srcObject = streamRef;
+    isCameraRunning = true;
+    await video.play();
+}
+
 async function checkBackend() {
     try {
-        const res = await fetch("http://localhost:5000/", {
-            method: "GET",
-            signal: AbortSignal.timeout(3000)
-        });
+        const res = await fetch("http://localhost:5000/");
         return res.ok;
     } catch {
         return false;
     }
 }
 
-// ── Wait for backend to come online (poll every 3s) ───────────
-function waitForBackend() {
-    console.log('[Detection] Waiting for backend...');
-    const interval = setInterval(async () => {
-        const ok = await checkBackend();
-        if (ok) {
-            clearInterval(interval);
-            backendOK = true;
-            consecutiveErrors = 0;
-            detItemName.innerText = 'Scanning...';
-            detItemType.innerText = 'YOLOv8 Active';
-            updateStatus('Model Ready');
-            // Clear any offline warning banners
-            const banner = document.getElementById('backend-offline-banner');
-            if (banner) banner.remove();
-            startFpsCounter();
-            detectFrame();
+async function startDetection() {
+    if (isCameraRunning) return;
+
+    try {
+        await setupCamera();
+
+        const available = await checkBackend();
+        if (!available) {
+            detItemName.innerText = "Backend Offline";
+            detItemType.innerText = "Start Flask server";
+            return;
         }
-    }, 3000);
+
+        backendOK = true;
+        startGPSTracking(); // Start capturing GPS
+        updateStatus("Scanning...");
+        detItemName.innerText = "Scanning...";
+        detItemType.innerText = "YOLO Active";
+        startFpsCounter();
+        
+        // Dispatch detection session start event
+        window.dispatchEvent(new Event("detectionSessionStart"));
+        
+        detectFrame();
+    } catch (err) {
+        console.error(err);
+        detItemName.innerText = "Camera Failed";
+    }
 }
 
-// ── Show offline warning in UI ────────────────────────────────
-function showBackendOfflineError() {
-    const existing = document.getElementById('backend-offline-banner');
-    if (existing) return;
-
-    const banner = document.createElement('div');
-    banner.id = 'backend-offline-banner';
-    banner.style.cssText = `
-        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-        background: #1f2937; border: 1px solid #ef4444; color: #f87171;
-        padding: 12px 24px; border-radius: 12px; font-size: 14px;
-        display: flex; align-items: center; gap: 10px; z-index: 9999;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-    `;
-    banner.innerHTML = `
-        <i class="fas fa-exclamation-triangle" style="color:#ef4444"></i>
-        <span><b>AI Backend Offline.</b> Run <code style="background:#374151;padding:2px 6px;border-radius:4px;">python yolo_api.py</code> then refresh.</span>
-    `;
-    document.body.appendChild(banner);
-}
-
-// ── Camera Setup ──────────────────────────────────────────────
-async function setupCamera() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Camera API not supported in this browser');
+function stopCamera() {
+    if (streamRef) {
+        streamRef.getTracks().forEach(track => track.stop());
+        streamRef = null;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' },
-        audio: false
-    });
+    video.srcObject = null;
+    isCameraRunning = false;
+    backendOK = false;
+    
+    // Stop GPS tracking and clear tracked objects
+    stopGPSTracking();
+    trackedObjects = [];
+    currentGPSLocation = null;
 
-    video.srcObject = stream;
+    if (fpsInterval) {
+        clearInterval(fpsInterval);
+        fpsInterval = null;
+    }
 
-    return new Promise((resolve) => {
-        video.onloadedmetadata = () => {
-            video.play().catch(err => console.warn('[Detection] Video play error:', err));
-            const camInfo = document.getElementById('cam-info');
-            if (camInfo) {
-                camInfo.innerText = `Resolution: ${video.videoWidth}×${video.videoHeight} • Camera ID: CAM-01`;
-            }
-            resolve();
-        };
-    });
+    detectionBox.classList.add("hidden");
+    updateStatus("Stopped");
+    detItemName.innerText = "Camera Stopped";
+    detItemType.innerText = "Waiting";
 }
 
-// ── FPS Counter ───────────────────────────────────────────────
 function startFpsCounter() {
     if (fpsInterval) clearInterval(fpsInterval);
+
     fpsInterval = setInterval(() => {
         const now = performance.now();
         const elapsed = (now - lastFpsTime) / 1000;
-        const fps = Math.round(frameCount / elapsed);
-        if (statSpeed) statSpeed.innerText = `${fps} FPS`;
+        const fps = elapsed > 0 ? Math.round(frameCount / elapsed) : 0;
+        statSpeed.innerText = `${fps} FPS`;
         frameCount = 0;
         lastFpsTime = now;
     }, 1000);
 }
 
-// ── Detection Loop ────────────────────────────────────────────
 async function detectFrame() {
-    if (!backendOK) return;
-
+    if (!backendOK || !isCameraRunning) return;
     if (video.readyState < 2) {
         requestAnimationFrame(detectFrame);
         return;
     }
 
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0);
 
     canvas.toBlob(async (blob) => {
-        const t0 = performance.now();
-
         try {
             const formData = new FormData();
-            formData.append('frame', blob, 'frame.jpg');
+            formData.append("frame", blob, "frame.jpg");
 
             const res = await fetch(API_URL, {
-                method: 'POST',
-                body: formData,
-                signal: AbortSignal.timeout(5000)   // 5 s timeout per frame
+                method: "POST",
+                body: formData
             });
 
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}`);
-            }
-
             const detections = await res.json();
-            consecutiveErrors = 0;
             frameCount++;
+            
+            // Cleanup old tracks periodically
+            cleanupOldTracks();
 
             if (detections.length > 0) {
                 const best = detections[0];
                 if (best.confidence >= CONFIDENCE_THRESHOLD) {
-                    renderPrediction(best.bbox, best.confidence, best.class);
-                } else {
-                    hideOverlay();
+                    // Track this detection and get the tracked object
+                    const trackedObj = trackDetection(best.class, best.bbox);
+                    const isNewDetection = !trackedObj.countedAsNew;
+                    renderPrediction(best.bbox, best.confidence, best.class, isNewDetection, trackedObj);
                 }
-            } else {
-                hideOverlay();
             }
-
         } catch (err) {
-            consecutiveErrors++;
-            console.warn(`[Detection] Frame error (${consecutiveErrors}):`, err.message);
-
-            // After 5 consecutive failures assume backend went offline
-            if (consecutiveErrors >= 5) {
-                backendOK = false;
-                if (fpsInterval) { clearInterval(fpsInterval); fpsInterval = null; }
-                updateStatus('Backend Lost');
-                detItemName.innerText = 'Connection lost';
-                detItemType.innerText = 'Retrying...';
-                showBackendOfflineError();
-                waitForBackend();
-                return;
-            }
+            console.error(err);
         }
 
         requestAnimationFrame(detectFrame);
-
-    }, 'image/jpeg', 0.8);   // 80% JPEG quality — good balance speed/accuracy
+    }, "image/jpeg", 0.8);
 }
 
-// ── Render Detection ──────────────────────────────────────────
-function renderPrediction(bbox, score, className) {
+function renderPrediction(bbox, score, className, isNewDetection, trackedObj) {
     const [x, y, w, h] = bbox;
 
     const scaleX = video.clientWidth / video.videoWidth;
@@ -270,46 +297,49 @@ function renderPrediction(bbox, score, className) {
     detectionBox.style.top = `${y * scaleY}px`;
     detectionBox.style.width = `${w * scaleX}px`;
     detectionBox.style.height = `${h * scaleY}px`;
-    detectionBox.classList.remove('hidden');
+    detectionBox.classList.remove("hidden");
 
     const percent = Math.round(score * 100);
     detectionLabel.innerText = `${className} • ${percent}%`;
 
-    const info = window.WASTE_TYPES[className] || { type: 'Unclassified', action: 'Analyze', color: '#9ca3af' };
+    const info = window.WASTE_TYPES[className] || {
+        type: "Unknown",
+        action: "Analyze",
+        color: "#9ca3af"
+    };
 
-    detItemName.innerText = className.charAt(0).toUpperCase() + className.slice(1);
+    detItemName.innerText = className;
     detItemType.innerText = info.type;
     detConfText.innerText = `${percent}%`;
     detConfBar.style.width = `${percent}%`;
     detConfBar.style.backgroundColor = info.color;
     detAction.innerText = info.action;
-    updateStatus('Detected');
+    updateStatus("Detected");
 
-    // Only dispatch event once per new class (avoids flooding history)
-    if (className !== lastDispatchedClass) {
-        lastDispatchedClass = className;
-        window.dispatchEvent(new CustomEvent('wasteDetected', {
-            detail: { className, type: info.type, percent, action: info.action }
+    // ONLY count new detections - avoid double-counting same object across frames
+    if (isNewDetection && trackedObj) {
+        trackedObj.countedAsNew = true; // Mark as counted
+        
+        window.dispatchEvent(new CustomEvent("wasteDetected", {
+            detail: {
+                className: className,
+                type: info.type,
+                percent: percent,
+                action: info.action,
+                timestamp: Date.now(),
+                gpsLocation: trackedObj.gpsLocation || null
+            }
         }));
     }
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-function hideOverlay() {
-    detectionBox.classList.add('hidden');
-    updateStatus('Scanning...');
-    if (detItemName.innerText !== 'Scanning...' &&
-        detItemName.innerText !== 'Backend Offline' &&
-        detItemName.innerText !== 'Connection lost') {
-        detItemName.innerText = 'Scanning...';
-        detItemType.innerText = 'YOLOv8 Active';
-    }
-    lastDispatchedClass = null;
 }
 
 function updateStatus(text) {
     if (detStatus) detStatus.innerText = text;
 }
 
-// ── Start ─────────────────────────────────────────────────────
-init();
+window.startDetection = startDetection;
+window.stopCamera = stopCamera;
+
+updateStatus("Idle");
+detItemName.innerText = "Click Start Detection";
+detItemType.innerText = "Waiting";

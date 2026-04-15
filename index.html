@@ -1,475 +1,769 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MR.SmartUSEME - AI Waste Classification System</title>
-
-  <!-- Tailwind CSS CDN -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MR.SmartUSEME • AI Waste Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'neon-green': '#00ff9d',
-            'neon-dark': '#00cc7a',
-            'warning-orange': '#f59e0b',
-            'error-red': '#ef4444',
-            'organic-yellow': '#fbbf24',
-          }
-        }
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * {
+      --tw-ring-color: rgba(0, 0, 0, 0);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1a1f3a 50%, #0f1729 100%);
+      color: #e2e8f0;
+    }
+
+    body.light-mode {
+      background: linear-gradient(135deg, #faf7f2 0%, #f5f0e8 50%, #faf7f2 100%);
+      color: #5a4f47;
+    }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+
+    body.light-mode .glass-panel {
+      background: rgba(255, 252, 248, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(186, 176, 168, 0.25);
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #00ff9d 0%, #10b981 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .smooth-transition {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-hover:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 255, 157, 0.15);
+    }
+
+    body.light-mode .card-hover:hover {
+      box-shadow: 0 20px 40px rgba(109, 184, 159, 0.2);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00ff9d 0%, #10b981 100%);
+      color: #0f172a;
+      font-weight: 600;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0, 255, 157, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(229, 231, 235, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: inherit;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(229, 231, 235, 0.15);
+      border-color: rgba(148, 163, 184, 0.5);
+    }
+
+    body.light-mode .btn-primary {
+      background: linear-gradient(135deg, #6db89f 0%, #7ec69f 100%);
+      color: #faf7f2;
+    }
+
+    body.light-mode .btn-primary:hover {
+      box-shadow: 0 10px 25px rgba(109, 184, 159, 0.25);
+    }
+
+    body.light-mode .btn-secondary {
+      background: rgba(113, 103, 97, 0.08);
+      border: 1px solid rgba(113, 103, 97, 0.2);
+      color: #5a4f47;
+    }
+
+    body.light-mode .btn-secondary:hover {
+      background: rgba(113, 103, 97, 0.12);
+      border-color: rgba(113, 103, 97, 0.35);
+    }
+
+    .pulsing-dot {
+      animation: pulse-ring 2s infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 157, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(0, 255, 157, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 157, 0);
       }
     }
-  </script>
 
-  <!-- Font Awesome for icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-  <!-- Chart.js for charts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- YOLOv8 detection handled by yolo_api.py (Flask backend) -->
-
-  <!-- Leaflet CSS (for GPS map) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <style>
-    #map {
-      height: 320px;
-      width: 100%;
-      border-radius: 0.75rem;
-      z-index: 0;
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
     }
 
-    .history-item-enter {
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .stat-counter {
+      transition: all 0.5s ease-out;
+    }
+
+    .detection-history-item {
       animation: slideIn 0.3s ease-out;
     }
 
     @keyframes slideIn {
       from {
         opacity: 0;
-        transform: translateY(-8px);
+        transform: translateX(-20px);
       }
-
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateX(0);
       }
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(148, 163, 184, 0.1);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 255, 157, 0.4);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 255, 157, 0.6);
+    }
+
+    body.light-mode ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    body.light-mode ::-webkit-scrollbar-thumb {
+      background: rgba(0, 255, 157, 0.5);
+    }
+
+    body.light-mode ::-webkit-scrollbar-thumb:hover {
+      background: rgba(109, 184, 159, 0.7);
+    }
+
+    /* Light mode text colors */
+    body.light-mode .text-slate-400 {
+      color: #8b8178;
+    }
+
+    body.light-mode .text-slate-500 {
+      color: #a49080;
+    }
+
+    body.light-mode .text-slate-100 {
+      color: #4a4238;
+    }
+
+    body.light-mode h1,
+    body.light-mode h2,
+    body.light-mode h3,
+    body.light-mode .text-slate-100 {
+      color: #3d3530;
+    }
+
+    /* Light mode backgrounds for colored cards */
+    body.light-mode .bg-emerald-500\/20 {
+      background-color: rgba(109, 184, 159, 0.12) !important;
+    }
+
+    body.light-mode .bg-red-500\/20 {
+      background-color: rgba(220, 90, 90, 0.12) !important;
+    }
+
+    body.light-mode .bg-slate-500\/20 {
+      background-color: rgba(140, 130, 115, 0.12) !important;
+    }
+
+    body.light-mode .bg-amber-500\/20 {
+      background-color: rgba(200, 140, 60, 0.12) !important;
+    }
+
+    body.light-mode .bg-blue-500\/20 {
+      background-color: rgba(100, 150, 200, 0.12) !important;
+    }
+
+    /* Light mode borders */
+    body.light-mode .border-slate-700\/50 {
+      border-color: rgba(186, 176, 168, 0.3) !important;
+    }
+
+    body.light-mode .border-emerald-500\/30 {
+      border-color: rgba(109, 184, 159, 0.35) !important;
+    }
+
+    body.light-mode .border-red-500\/30 {
+      border-color: rgba(220, 90, 90, 0.35) !important;
+    }
+
+    body.light-mode .border-slate-500\/30 {
+      border-color: rgba(140, 130, 115, 0.35) !important;
+    }
+
+    body.light-mode .text-emerald-400 {
+      color: #6db89f;
+    }
+
+    body.light-mode .text-red-400 {
+      color: #d45050;
+    }
+
+    body.light-mode .text-blue-400 {
+      color: #7ba8c4;
+    }
+
+    /* Light mode detection box styling */
+    body.light-mode #detection-box {
+      border-color: #6db89f !important;
+      box-shadow: 0 0 20px rgba(109, 184, 159, 0.4) !important;
+    }
+
+    body.light-mode #detection-label {
+      color: #6db89f !important;
+    }
+
+    /* Light mode chart text colors */
+    body.light-mode canvas {
+      filter: brightness(0.95);
     }
   </style>
 </head>
-
-<body class="bg-gray-950 text-gray-100 font-sans antialiased">
-
-  <!-- ── HEADER ── -->
-  <header class="bg-gray-900/80 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="text-2xl font-bold text-neon-green flex items-center gap-2">
-          <i class="fas fa-wave-square text-neon-green"></i> MR.SmartUSEME
-        </div>
-        <span class="text-sm text-gray-400">AI Waste Classification System</span>
+<body class="text-slate-100">
+  <!-- Header with gradient -->
+  <header class="glass-panel sticky top-0 z-50 border-b">
+    <div class="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
+      <div class="space-y-1">
+        <h1 class="font-display text-4xl font-bold gradient-text tracking-tight">MR.SmartUSEME</h1>
+        <p class="text-sm text-slate-400">AI-Powered Waste Intelligence Dashboard</p>
       </div>
-      <div class="flex items-center gap-4 text-sm">
-        <div class="flex items-center gap-2">
-          <span class="h-2 w-2 rounded-full bg-neon-green animate-pulse"></span>
-          System Online
-        </div>
-        <i class="fas fa-camera text-gray-400"></i> CAM-01
-        <i class="fas fa-wifi text-gray-400"></i> Connected
-        <i class="fas fa-cloud text-gray-400"></i> Cloud Sync
-      </div>
+      <button id="theme-toggle" class="btn-secondary px-6 py-2 rounded-xl font-medium smooth-transition">
+        🌙 Dark
+      </button>
     </div>
   </header>
 
-  <!-- ── STATS BAR ── -->
-  <section class="py-8">
-    <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
-        <p class="text-sm text-gray-400">Detection Rate</p>
-        <p class="text-2xl font-bold text-neon-green" id="stat-rate">96.4%</p>
-        <i class="fas fa-arrow-up text-neon-green text-xs"></i>
-      </div>
-      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
-        <p class="text-sm text-gray-400">Processing Speed</p>
-        <p class="text-2xl font-bold text-neon-green" id="stat-speed">–</p>
-        <i class="fas fa-bolt text-neon-green text-xs"></i>
-      </div>
-      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
-        <p class="text-sm text-gray-400">Model Accuracy</p>
-        <p class="text-2xl font-bold text-neon-green">98.7%</p>
-      </div>
-      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
-        <p class="text-sm text-gray-400">Items Today</p>
-        <p class="text-2xl font-bold text-neon-green" id="stat-items">0</p>
-        <i class="fas fa-clock text-neon-green text-xs"></i>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── MAIN CONTENT ── -->
-  <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-    <!-- Left: Live Feed + Detection History -->
-    <div class="lg:col-span-2 space-y-6">
-
-      <!-- Live Camera Feed -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 overflow-hidden">
-        <div class="bg-gray-800 px-4 py-2 flex items-center justify-between text-sm">
-          <div class="flex items-center gap-2">
-            <span class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
-            Live Camera Feed • REC
+  <main class="pt-8 pb-16">
+    <!-- Hero Stats Section -->
+    <section class="max-w-7xl mx-auto px-6 mb-12">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="glass-panel rounded-2xl p-6 card-hover">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-slate-400 text-sm font-medium">Total Detections</p>
+              <p class="text-4xl font-bold gradient-text mt-2 stat-counter" id="total-detections">0</p>
+            </div>
+            <div class="text-4xl pulsing-dot w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              📊
+            </div>
           </div>
-          <div class="text-gray-400" id="cam-info">Initializing camera... • Camera ID: CAM-01</div>
         </div>
-        <div class="aspect-video bg-gray-950 relative overflow-hidden">
-          <video id="live-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
 
-          <!-- Bounding box overlay -->
-          <div class="absolute inset-0 pointer-events-none" id="overlay-container">
-            <canvas id="detection-canvas" class="absolute inset-0 w-full h-full"></canvas>
-            <div id="detection-box"
-              class="hidden absolute border-4 border-dashed border-neon-green/70 rounded-xl transition-all duration-75 ease-out">
-              <div id="detection-label-box"
-                class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900/80 px-5 py-2 rounded-full text-neon-green font-semibold shadow-lg whitespace-nowrap">
-                <span id="detection-label">Initializing...</span>
+        <div class="glass-panel rounded-2xl p-6 card-hover">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-slate-400 text-sm font-medium">Detection Rate</p>
+              <p class="text-4xl font-bold gradient-text mt-2 stat-counter" id="detection-rate">–</p>
+            </div>
+            <div class="text-4xl w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center">
+              ⚡
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-panel rounded-2xl p-6 card-hover">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-slate-400 text-sm font-medium">GPS Tracked Items</p>
+              <p class="text-4xl font-bold gradient-text mt-2 stat-counter" id="gps-tracked">0</p>
+            </div>
+            <div class="text-4xl w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center">
+              📍
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Detection Feed Section -->
+    <section class="max-w-7xl mx-auto px-6 mb-12">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Live Video Feed -->
+        <div class="lg:col-span-2">
+          <div class="glass-panel rounded-3xl overflow-hidden border">
+            <div class="px-6 py-5 border-b border-slate-700/50 flex justify-between items-center">
+              <div>
+                <h2 class="font-display text-2xl font-bold">Live Detection Feed</h2>
+                <p id="cam-info" class="text-slate-400 text-sm mt-1">🎥 Camera idle • FPS: <span id="stat-speed">0</span></p>
+              </div>
+              <div class="flex gap-3">
+                <button onclick="startDetection()" class="btn-primary px-6 py-2.5 rounded-xl font-semibold smooth-transition">
+                  ▶ Start
+                </button>
+                <button onclick="stopCamera()" class="btn-secondary px-6 py-2.5 rounded-xl font-semibold smooth-transition">
+                  ⏹ Stop
+                </button>
+              </div>
+            </div>
+            <div class="relative aspect-video bg-black overflow-hidden">
+              <video id="live-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+              <div id="detection-box" class="hidden absolute border-4 border-emerald-400 rounded-xl shadow-lg" style="box-shadow: 0 0 20px rgba(0, 255, 157, 0.5);"></div>
+              <div class="absolute top-4 left-4 glass-panel px-4 py-2 rounded-full border smooth-transition">
+                <span id="detection-label" class="text-sm font-semibold text-emerald-400">Awaiting Detection</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar: Current Detection + History -->
+        <div class="space-y-6">
+          <!-- Current Detection Card -->
+          <div class="glass-panel border rounded-2xl p-6 card-hover">
+            <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">Current Detection</p>
+            <h3 id="det-item-name" class="font-display text-4xl font-bold gradient-text mt-3">Idle</h3>
+            <div class="mt-5 space-y-4">
+              <div>
+                <div class="flex justify-between items-center mb-2">
+                  <span class="text-slate-400 text-sm">Category</span>
+                  <span id="det-item-type" class="text-emerald-400 font-semibold">Waiting</span>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-2">
+                  <span class="text-slate-400 text-sm">Confidence</span>
+                  <span id="det-conf-text" class="text-emerald-400 font-semibold">0%</span>
+                </div>
+                <div class="h-2.5 rounded-full bg-slate-700/50 overflow-hidden">
+                  <div id="det-conf-bar" class="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 smooth-transition" style="width:0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400 text-sm">Action</span>
+                  <span id="det-action" class="text-emerald-400 font-semibold text-sm">Monitor</span>
+                </div>
+              </div>
+              <div class="mt-4 pt-4 border-t border-slate-700/50">
+                <p class="text-xs text-slate-500 uppercase tracking-wider">Status</p>
+                <p id="det-status" class="text-sm font-semibold text-emerald-400 mt-1">Idle</p>
               </div>
             </div>
           </div>
 
-          <!-- Status indicator -->
-          <div class="absolute bottom-3 right-3 bg-black/60 px-3 py-1 rounded-full text-xs text-neon-green">
-            CAM-01 • Live
+          <!-- Detection History Card -->
+          <div class="glass-panel border rounded-2xl p-6">
+            <h3 class="font-display text-lg font-bold mb-4">Recent Detections</h3>
+            <div id="detection-history" class="space-y-2 max-h-96 overflow-y-auto">
+              <p class="text-slate-500 text-sm text-center py-8">Detections will appear here...</p>
+            </div>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- Detection History -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
-        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-          <i class="fas fa-history text-neon-green"></i>
-          Detection History •
-          <span id="history-count">0</span> Items
-        </h3>
-        <div id="detection-history" class="space-y-2 text-sm max-h-72 overflow-y-auto pr-1">
-          <p class="text-gray-500 text-center py-4">Detections will appear here...</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right: Current Detection + Bin Monitoring -->
-    <div class="space-y-6">
-
-      <!-- Current Detection -->
-      <div class="bg-gray-900/70 rounded-2xl border border-neon-green/30 p-4 text-center">
-        <h3 class="text-lg font-semibold mb-4">Current Detection</h3>
-        <p id="det-item-name" class="text-2xl font-bold text-neon-green">Scanning...</p>
-        <p id="det-item-type" class="text-sm text-gray-400 mb-2">System Active</p>
-        <div class="mb-4">
-          <p class="text-sm text-gray-400">Confidence Level</p>
-          <div class="h-2 bg-gray-700 rounded-full overflow-hidden mt-1">
-            <div id="det-conf-bar" class="h-full bg-neon-green transition-all duration-200" style="width: 0%"></div>
+    <!-- Analytics Grid -->
+    <section class="max-w-7xl mx-auto px-6 mb-12">
+      <h2 class="font-display text-2xl font-bold mb-6">Analytics & Insights</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Category Analytics -->
+        <div class="glass-panel border rounded-2xl p-6">
+          <h3 class="font-display text-lg font-bold mb-6">Category Breakdown</h3>
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="rounded-xl bg-emerald-500/20 border border-emerald-500/30 p-4 text-center card-hover">
+              <p class="text-slate-400 text-xs font-medium mb-2">Recyclable</p>
+              <p id="recyclable-count" class="font-display text-3xl font-bold text-emerald-400 stat-counter">0</p>
+            </div>
+            <div class="rounded-xl bg-red-500/20 border border-red-500/30 p-4 text-center card-hover">
+              <p class="text-slate-400 text-xs font-medium mb-2">Hazardous</p>
+              <p id="hazardous-count" class="font-display text-3xl font-bold text-red-400 stat-counter">0</p>
+            </div>
+            <div class="rounded-xl bg-slate-500/20 border border-slate-500/30 p-4 text-center card-hover">
+              <p class="text-slate-400 text-xs font-medium mb-2">Trash</p>
+              <p id="trash-count" class="font-display text-3xl font-bold text-slate-300 stat-counter">0</p>
+            </div>
           </div>
-          <p id="det-conf-text" class="text-neon-green mt-1">0%</p>
+          <div class="h-64">
+            <canvas id="pieChart"></canvas>
+          </div>
         </div>
-        <p class="text-sm">
-          Status: <span id="det-status" class="text-neon-green">Active</span> •
-          Action: <span id="det-action" class="text-warning-orange">Monitor</span>
-        </p>
-      </div>
 
-      <!-- Multi-Bin Monitoring -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
-        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-          <i class="fas fa-trash-can text-neon-green"></i> Multi-Bin Monitoring
-        </h3>
-        <p class="text-sm text-gray-400 mb-4">Total Bins: 6 • Active: 5</p>
-        <table class="w-full text-xs">
-          <thead>
-            <tr class="text-gray-400 border-b border-gray-700">
-              <th class="pb-2 text-left">Bin ID</th>
-              <th class="pb-2 text-left">Location</th>
-              <th class="pb-2 text-left">Fill</th>
-              <th class="pb-2 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody id="bin-table-body">
-            <tr class="border-b border-gray-800">
-              <td class="py-1.5">BIN-A12</td>
-              <td class="py-1.5">Downtown</td>
-              <td class="py-1.5">85%</td>
-              <td class="py-1.5 text-warning-orange">Warning</td>
-            </tr>
-            <tr class="border-b border-gray-800">
-              <td class="py-1.5">BIN-B03</td>
-              <td class="py-1.5">Park North</td>
-              <td class="py-1.5">42%</td>
-              <td class="py-1.5 text-neon-green">Normal</td>
-            </tr>
-            <tr class="border-b border-gray-800">
-              <td class="py-1.5">BIN-C07</td>
-              <td class="py-1.5">Market St</td>
-              <td class="py-1.5">97%</td>
-              <td class="py-1.5 text-error-red">Full</td>
-            </tr>
-            <tr class="border-b border-gray-800">
-              <td class="py-1.5">BIN-D15</td>
-              <td class="py-1.5">Station Rd</td>
-              <td class="py-1.5">20%</td>
-              <td class="py-1.5 text-neon-green">Normal</td>
-            </tr>
-            <tr class="border-b border-gray-800">
-              <td class="py-1.5">BIN-E22</td>
-              <td class="py-1.5">University</td>
-              <td class="py-1.5">61%</td>
-              <td class="py-1.5 text-neon-green">Normal</td>
-            </tr>
-            <tr>
-              <td class="py-1.5">BIN-F09</td>
-              <td class="py-1.5">Airport</td>
-              <td class="py-1.5">–</td>
-              <td class="py-1.5 text-gray-500">Offline</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- GPS Location Info Panel -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
-        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
-          <i class="fas fa-location-dot text-neon-green"></i> Device Location
-        </h3>
-        <div id="gps-info" class="text-sm text-gray-400 space-y-1">
-          <p>Acquiring GPS signal...</p>
+        <!-- Top Waste Types -->
+        <div class="glass-panel border rounded-2xl p-6">
+          <h3 class="font-display text-lg font-bold mb-6">Top Waste Items</h3>
+          <div class="h-64 mb-4">
+            <canvas id="barChart"></canvas>
+          </div>
+          <div id="top-waste-list" class="space-y-2 max-h-40 overflow-y-auto">
+            <p class="text-slate-500 text-sm text-center py-4">Top items will appear here...</p>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <!-- GPS Smart Bin Map -->
+    <section class="max-w-7xl mx-auto px-6 mb-12">
+      <h2 class="font-display text-2xl font-bold mb-6">GPS Smart Bin Tracker</h2>
+      <div class="glass-panel border rounded-2xl p-6 card-hover">
+        <div id="map-container" class="rounded-xl overflow-hidden" style="min-height: 400px;">
+          <div id="map" class="w-full h-96 rounded-lg"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <!-- ── CHARTS + MAP SECTION ── -->
-  <section class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-
-    <!-- Pie / Doughnut Chart -->
-    <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
-      <h3 class="text-lg font-semibold mb-4">Waste Category Distribution</h3>
-      <canvas id="pieChart" height="200"></canvas>
-    </div>
-
-    <!-- Bar Chart -->
-    <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
-      <h3 class="text-lg font-semibold mb-4">Top Waste Types Detected</h3>
-      <canvas id="barChart" height="200"></canvas>
-    </div>
-
-    <!-- GPS Leaflet Map -->
-    <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4 md:col-span-2">
-      <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-        <i class="fas fa-map-marked-alt text-neon-green"></i> GPS Live Map
-        <span id="gps-coords" class="text-sm font-normal text-gray-400 ml-2"></span>
-      </h3>
-      <div id="map"></div>
-      <div class="flex gap-3 mt-4">
-        <button id="btn-open-maps" onclick="openInMaps()"
-          class="px-4 py-2 bg-neon-green text-gray-900 font-semibold rounded-lg hover:bg-neon-dark transition-colors">
-          <i class="fas fa-external-link-alt mr-1"></i> Open in Google Maps
-        </button>
-        <button onclick="GPS.initMapWithLocation('map')"
-          class="px-4 py-2 border border-neon-green text-neon-green rounded-lg hover:bg-neon-green/10 transition-colors">
-          <i class="fas fa-sync mr-1"></i> Refresh Location
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── FOOTER ── -->
-  <footer class="bg-gray-900/90 border-t border-gray-800 py-10 text-center text-gray-400">
-    <div class="max-w-7xl mx-auto px-4">
-      <p class="text-lg">MR.SmartUSEME © 2026</p>
-      <p class="mt-2">AI-Powered Waste Management • Cleaner Cities, Smarter Bins</p>
-    </div>
-  </footer>
-
-  <!-- ────────────────────────────────────────────────────── -->
-  <!--  SCRIPTS — load order matters:                        -->
-  <!--  1. Leaflet (map library)                             -->
-  <!--  2. gps.js (depends on Leaflet)                       -->
-  <!--  3. detection.js (depends on TF.js, DOM elements)     -->
-  <!--  4. Inline bootstrap + Chart.js charts                -->
-  <!-- ────────────────────────────────────────────────────── -->
-
-  <!-- Leaflet JS -->
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- GPS module -->
   <script src="gps.js"></script>
-
-  <!-- Detection module -->
   <script src="detection.js"></script>
 
-  <!-- Bootstrap + Charts inline -->
   <script>
-    // ── Charts ──────────────────────────────────────────────
-    const pieChartData = {
-      labels: ['Recyclable', 'Trash', 'Hazardous'],
-      counts: [0, 0, 0]
-    };
+    // ── Theme Toggle ──────────────────────────────────────
+    const themeToggle = document.getElementById('theme-toggle');
+    let isDarkMode = true;
 
-    let pieChart = new Chart(document.getElementById('pieChart'), {
-      type: 'doughnut',
-      data: {
-        labels: pieChartData.labels,
-        datasets: [{
-          data: pieChartData.counts,
-          backgroundColor: ['#00ff9d', '#6b7280', '#ef4444'],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: 'bottom', labels: { color: '#e5e7eb' } } }
+    function setTheme(dark) {
+      isDarkMode = dark;
+      const body = document.body;
+      const btn = themeToggle;
+      
+      if (dark) {
+        body.classList.remove('light-mode');
+        btn.textContent = '🌙 Dark';
+      } else {
+        body.classList.add('light-mode');
+        btn.textContent = '☀️ Light';
       }
-    });
+      localStorage.setItem('smartuseme-theme', dark ? 'dark' : 'light');
+    }
 
-    let barChart = new Chart(document.getElementById('barChart'), {
-      type: 'bar',
-      data: {
-        labels: [],
-        datasets: [{
-          label: 'Count',
-          data: [],
-          backgroundColor: '#10b981',
-          borderColor: '#059669',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          y: { beginAtZero: true, ticks: { color: '#9ca3af' } },
-          x: { ticks: { color: '#9ca3af' } }
-        },
-        plugins: { legend: { display: false } }
-      }
-    });
+    themeToggle.addEventListener('click', () => setTheme(!isDarkMode));
 
-    // ── Detection history wiring ──────────────────────────
-    const historyContainer = document.getElementById('detection-history');
-    const historyCount = document.getElementById('history-count');
-    const statItems = document.getElementById('stat-items');
+    // Load saved theme
+    const savedTheme = localStorage.getItem('smartuseme-theme');
+    setTheme(savedTheme !== 'light');
+
+    // ── Analytics State ───────────────────────────────────
+    let wasteTypeCounts = {};
+    let categoryStats = { Recyclable: 0, Hazardous: 0, Trash: 0 };
+    let detectionHistory = [];
     let totalDetections = 0;
-    const wasteTypeCounts = {};
+    let sessionStartTime = null;
 
-    const WASTE_ICONS = {
-      'Recyclable': 'fa-recycle text-neon-green',
-      'Trash': 'fa-trash text-gray-400',
-      'Hazardous': 'fa-biohazard text-error-red',
-      'Unclassified': 'fa-question text-gray-400',
-    };
+    // ── GPS Map State ─────────────────────────────────────
+    let mapInstance = null;
+    let detectionMarkers = {};
+    let mapInitialized = false;
 
-    // Listen for detections dispatched by detection.js
-    window.addEventListener('wasteDetected', (e) => {
-      const { className, type, percent, action } = e.detail;
+    // ── Initialize Charts ─────────────────────────────────
+    const pieCtx = document.getElementById('pieChart');
+    const barCtx = document.getElementById('barChart');
 
-      totalDetections++;
-      statItems.innerText = totalDetections;
-      historyCount.innerText = totalDetections;
+    let pieChart = null;
+    let barChart = null;
 
-      // Update waste type counts for charts
-      wasteTypeCounts[className] = (wasteTypeCounts[className] || 0) + 1;
-      updateCharts();
-
-      // Remove placeholder
-      const placeholder = historyContainer.querySelector('p');
-      if (placeholder) placeholder.remove();
-
-      // Create history row
-      const iconClass = WASTE_ICONS[type] || 'fa-question text-gray-400';
-      const now = new Date().toLocaleTimeString();
-      const row = document.createElement('div');
-      row.className = 'flex justify-between items-center bg-gray-800/50 p-3 rounded-lg history-item-enter';
-      row.innerHTML = `
-        <div class="flex items-center gap-2">
-          <i class="fas ${iconClass}"></i>
-          <span class="font-medium">${className}</span>
-          <span class="text-gray-400">• ${type}</span>
-        </div>
-        <div class="text-right">
-          <span class="text-neon-green">${percent}%</span>
-          <span class="text-gray-500 ml-2 text-xs">${now}</span>
-        </div>`;
-
-      // Prepend (newest first), limit to 50
-      historyContainer.prepend(row);
-      const rows = historyContainer.querySelectorAll('div');
-      if (rows.length > 50) rows[rows.length - 1].remove();
-    });
-
-    function updateCharts() {
-      // Bar chart: top 7 waste types sorted by count
-      const sorted = Object.entries(wasteTypeCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 7);
-
-      barChart.data.labels = sorted.map(([k]) => k);
-      barChart.data.datasets[0].data = sorted.map(([, v]) => v);
-      barChart.update('none');
-
-      // Pie chart: breakdown by high-level category
-      const catMap = { Recyclable: 0, Trash: 0, Hazardous: 0 };
-      Object.entries(wasteTypeCounts).forEach(([cls, cnt]) => {
-        if (window.WASTE_TYPES && window.WASTE_TYPES[cls]) {
-          const cat = window.WASTE_TYPES[cls].type;
-          if (cat in catMap) catMap[cat] += cnt;
+    if (pieCtx) {
+      pieChart = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Recyclable', 'Hazardous', 'Trash'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['#00ff9d', '#ef4444', '#64748b'],
+            borderColor: 'rgba(15, 23, 42, 0.8)',
+            borderWidth: 2,
+            hoverOffset: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#94a3b8',
+                font: { size: 13, family: "'Inter', sans-serif" },
+                padding: 15,
+                usePointStyle: true
+              }
+            }
+          }
         }
       });
-      pieChart.data.datasets[0].data = Object.values(catMap);
-      pieChart.update('none');
     }
 
-    // ── GPS init ─────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', () => {
-      GPS.initMapWithLocation('map', { zoom: 15, markerText: 'Bin Location' });
-
-      // Update small GPS coords label
-      GPS.getCurrentLocation(
-        (pos) => {
-          document.getElementById('gps-coords').innerText =
-            `${pos.latitude.toFixed(5)}°N, ${pos.longitude.toFixed(5)}°E`;
-          document.getElementById('gps-info').innerHTML = `
-            <p><span class="text-gray-300">Latitude:</span> ${pos.latitude.toFixed(6)}°</p>
-            <p><span class="text-gray-300">Longitude:</span> ${pos.longitude.toFixed(6)}°</p>
-            <p><span class="text-gray-300">Accuracy:</span> ±${pos.accuracy.toFixed(0)} m</p>
-            <p><span class="text-gray-300">Updated:</span> ${pos.timestamp}</p>`;
-          // Setup open-in-maps button
-          document.getElementById('btn-open-maps').onclick = () =>
-            window.open(`https://www.google.com/maps?q=${pos.latitude},${pos.longitude}`, '_blank');
+    if (barCtx) {
+      barChart = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Detections',
+            data: [],
+            backgroundColor: 'rgba(0, 255, 157, 0.8)',
+            borderColor: 'rgba(0, 255, 157, 1)',
+            borderRadius: 8,
+            borderWidth: 2
+          }]
         },
-        (err) => {
-          document.getElementById('gps-info').innerHTML =
-            `<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-1"></i>${err}</p>`;
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { color: '#94a3b8', font: { size: 12 } },
+              grid: { color: 'rgba(148, 163, 184, 0.1)' }
+            },
+            y: {
+              ticks: { color: '#94a3b8', font: { size: 12 } },
+              grid: { display: false }
+            }
+          },
+          plugins: { legend: { display: false } }
         }
-      );
+      });
+    }
 
-      // Watch for live location updates
-      GPS.startWatchingLocation(
-        (pos) => {
-          document.getElementById('gps-coords').innerText =
-            `${pos.latitude.toFixed(5)}°N, ${pos.longitude.toFixed(5)}°E`;
-        },
-        (err) => console.warn('GPS watch error:', err)
-      );
+    // ── GPS Map Initialization ────────────────────────────
+    function initializeMap() {
+      if (mapInitialized) return;
+      
+      const mapEl = document.getElementById('map');
+      if (!mapEl) return;
+
+      mapInstance = L.map('map', { zoomControl: true }).setView([0, 0], 2);
+      mapInitialized = true;
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(mapInstance);
+    }
+
+    function addDetectionMarker(detectionId, className, type, gpsLocation) {
+      if (!gpsLocation || !mapInstance) return;
+      if (detectionMarkers[detectionId]) return;
+
+      const { latitude, longitude } = gpsLocation;
+      const colorMap = { 'Recyclable': '#00ff9d', 'Hazardous': '#ef4444', 'Trash': '#64748b' };
+      const markerColor = colorMap[type] || '#9ca3af';
+
+      const customIcon = L.divIcon({
+        className: '',
+        html: `<div style="width:18px;height:18px;border-radius:50%;background:${markerColor};border:3px solid #fff;box-shadow:0 0 12px ${markerColor};"></div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+
+      const marker = L.marker([latitude, longitude], { icon: customIcon })
+        .addTo(mapInstance)
+        .bindPopup(`
+          <div style="color:#0f172a;font-size:12px;font-family:'Inter',sans-serif;">
+            <b>${className}</b><br>
+            <span style="color:#64748b;">Type: ${type}</span><br>
+            <span style="color:#64748b;">Lat: ${latitude.toFixed(6)}</span><br>
+            <span style="color:#64748b;">Lon: ${longitude.toFixed(6)}</span>
+          </div>
+        `);
+
+      detectionMarkers[detectionId] = marker;
+
+      if (Object.keys(detectionMarkers).length === 1) {
+        mapInstance.setView([latitude, longitude], 15);
+      } else {
+        const markerGroup = new L.featureGroup(Object.values(detectionMarkers));
+        mapInstance.fitBounds(markerGroup.getBounds().pad(0.1), { maxZoom: 15 });
+      }
+    }
+
+    function fitMapToMarkers() {
+      if (!mapInstance || Object.keys(detectionMarkers).length === 0) return;
+      const markerGroup = new L.featureGroup(Object.values(detectionMarkers));
+      mapInstance.fitBounds(markerGroup.getBounds().pad(0.1), { maxZoom: 15 });
+    }
+
+    // ── Session Start ─────────────────────────────────────
+    window.addEventListener('detectionSessionStart', () => {
+      sessionStartTime = Date.now();
+      totalDetections = 0;
+      if (mapInstance) {
+        Object.values(detectionMarkers).forEach(marker => marker.remove());
+      }
+      detectionMarkers = {};
+      updateStats();
     });
 
-    function openInMaps() {
-      GPS.getCurrentLocation(
-        (pos) => window.open(`https://www.google.com/maps?q=${pos.latitude},${pos.longitude}`, '_blank'),
-        () => alert('Could not get location. Please allow GPS access.')
-      );
+    // ── Detection Event Listener ──────────────────────────
+    window.addEventListener('wasteDetected', (e) => {
+      const { className, type, percent, action, timestamp, gpsLocation } = e.detail;
+
+      // Update totals
+      totalDetections++;
+      categoryStats[type] = (categoryStats[type] || 0) + 1;
+      wasteTypeCounts[className] = (wasteTypeCounts[className] || 0) + 1;
+
+      // Update UI
+      document.getElementById('recyclable-count').textContent = categoryStats.Recyclable;
+      document.getElementById('hazardous-count').textContent = categoryStats.Hazardous;
+      document.getElementById('trash-count').textContent = categoryStats.Trash;
+
+      // Add to history
+      detectionHistory.unshift({
+        className,
+        type,
+        percent,
+        action,
+        timestamp: new Date(timestamp).toLocaleTimeString(),
+        gpsLocation: gpsLocation
+      });
+
+      if (detectionHistory.length > 20) detectionHistory.pop();
+
+      // Initialize map on first detection
+      if (!mapInitialized) initializeMap();
+
+      // Add marker
+      if (gpsLocation) {
+        const detectionId = `${className}_${gpsLocation.latitude}_${gpsLocation.longitude}_${timestamp}`;
+        addDetectionMarker(detectionId, className, type, gpsLocation);
+      }
+
+      updateDetectionHistory();
+      updateCharts();
+      updateStats();
+    });
+
+    function updateDetectionHistory() {
+      const historyEl = document.getElementById('detection-history');
+      
+      if (detectionHistory.length === 0) {
+        historyEl.innerHTML = '<p class="text-slate-500 text-sm text-center py-8">Detections will appear here...</p>';
+        return;
+      }
+
+      historyEl.innerHTML = detectionHistory.slice(0, 8).map((d, i) => {
+        const gpsText = d.gpsLocation 
+          ? `📍 ${d.gpsLocation.latitude.toFixed(5)}, ${d.gpsLocation.longitude.toFixed(5)}`
+          : '📍 Location unavailable';
+        
+        const typeColors = {
+          'Recyclable': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+          'Hazardous': 'bg-red-500/20 text-red-400 border-red-500/30',
+          'Trash': 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+        };
+        const typeColor = typeColors[d.type] || typeColors['Trash'];
+
+        return `
+          <div class="detection-history-item glass-panel border rounded-lg p-3 hover:border-emerald-500/50 smooth-transition">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <span class="font-semibold text-emerald-400">${d.className}</span>
+                <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium ${typeColor} border">${d.type}</span>
+              </div>
+              <span class="text-emerald-400 font-bold">${d.percent}%</span>
+            </div>
+            <div class="text-slate-400 text-xs space-y-1">
+              <div>${gpsText}</div>
+              <div class="text-slate-500">${d.timestamp}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateCharts() {
+      if (!pieChart || !barChart) return;
+
+      pieChart.data.datasets[0].data = [
+        categoryStats.Recyclable,
+        categoryStats.Hazardous,
+        categoryStats.Trash
+      ];
+      pieChart.update('none');
+
+      const sorted = Object.entries(wasteTypeCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+
+      barChart.data.labels = sorted.map(([name]) => name);
+      barChart.data.datasets[0].data = sorted.map(([, count]) => count);
+      barChart.update('none');
+
+      const listEl = document.getElementById('top-waste-list');
+      if (listEl) {
+        if (sorted.length === 0) {
+          listEl.innerHTML = '<p class="text-slate-500 text-sm text-center py-4">No detections yet...</p>';
+        } else {
+          listEl.innerHTML = sorted.map(([name, count]) => `
+            <div class="flex justify-between items-center p-2 rounded border border-slate-700/30 hover:border-emerald-500/30 smooth-transition">
+              <span class="text-sm">${name}</span>
+              <span class="font-bold text-emerald-400">${count}</span>
+            </div>
+          `).join('');
+        }
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('total-detections').textContent = totalDetections;
+      
+      if (sessionStartTime) {
+        const elapsedSec = (Date.now() - sessionStartTime) / 1000;
+        const rate = elapsedSec > 0 ? (totalDetections / (elapsedSec / 60)).toFixed(1) : '–';
+        document.getElementById('detection-rate').textContent = `${rate}/min`;
+      }
+      
+      document.getElementById('gps-tracked').textContent = Object.keys(detectionMarkers).length;
     }
   </script>
-
 </body>
-
 </html>
