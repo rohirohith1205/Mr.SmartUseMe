@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MR.SmartUSEME - AI Waste Classification System</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'neon-green': '#00ff9d',
+            'neon-dark': '#00cc7a',
+            'warning-orange': '#f59e0b',
+            'error-red': '#ef4444',
+            'organic-yellow': '#fbbf24',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Chart.js for charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- YOLOv8 detection handled by yolo_api.py (Flask backend) -->
+
+  <!-- Leaflet CSS (for GPS map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    #map {
+      height: 320px;
+      width: 100%;
+      border-radius: 0.75rem;
+      z-index: 0;
+    }
+
+    .history-item-enter {
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 text-gray-900 font-sans antialiased">
+
+  <!-- ── HEADER ── -->
+  <header class="bg-white backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="text-2xl font-bold text-neon-green flex items-center gap-2">
+          <i class="fas fa-wave-square text-neon-green"></i> MR.SmartUSEME
+        </div>
+        <span class="text-sm text-gray-400">AI Waste Classification System</span>
+      </div>
+      <div class="flex items-center gap-4 text-sm">
+        <div class="flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-neon-green animate-pulse"></span>
+          System Online
+        </div>
+        <i class="fas fa-camera text-gray-400"></i> CAM-01
+        <i class="fas fa-wifi text-gray-400"></i> Connected
+        <i class="fas fa-cloud text-gray-400"></i> Cloud Sync
+      </div>
+    </div>
+  </header>
+
+  <!-- ── STATS BAR ── -->
+  <section class="py-8">
+    <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
+        <p class="text-sm text-gray-400">Detection Rate</p>
+        <p class="text-2xl font-bold text-neon-green" id="stat-rate">96.4%</p>
+        <i class="fas fa-arrow-up text-neon-green text-xs"></i>
+      </div>
+      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
+        <p class="text-sm text-gray-400">Processing Speed</p>
+        <p class="text-2xl font-bold text-neon-green" id="stat-speed">–</p>
+        <i class="fas fa-bolt text-neon-green text-xs"></i>
+      </div>
+      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
+        <p class="text-sm text-gray-400">Model Accuracy</p>
+        <p class="text-2xl font-bold text-neon-green">98.7%</p>
+      </div>
+      <div class="bg-gray-900/50 p-4 rounded-xl border border-gray-800 text-center">
+        <p class="text-sm text-gray-400">Items Today</p>
+        <p class="text-2xl font-bold text-neon-green" id="stat-items">0</p>
+        <i class="fas fa-clock text-neon-green text-xs"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left: Live Feed + Detection History -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <!-- Live Camera Feed -->
+            <div class="bg-gray-100 px-4 py-2 flex items-center justify-between text-sm border-b border-gray-200">
+        <div class="flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+          Live Camera Feed
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="text-gray-500" id="cam-info">Camera idle • Camera ID: CAM-01</div>
+
+          <button
+            onclick="startDetection()"
+            class="px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition">
+            Start
+          </button>
+
+          <button
+            onclick="stopCamera()"
+            class="px-3 py-1 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition">
+            Stop
+          </button>
+        </div>
+    </div>
+
+          <!-- Bounding box overlay -->
+          <div class="absolute inset-0 pointer-events-none" id="overlay-container">
+            <canvas id="detection-canvas" class="absolute inset-0 w-full h-full"></canvas>
+            <div id="detection-box"
+              class="hidden absolute border-4 border-dashed border-neon-green/70 rounded-xl transition-all duration-75 ease-out">
+              <div id="detection-label-box"
+                class="absolute -top-8 left-1/2 -translate-x-1/2 bg-white px-5 py-2 rounded-full text-neon-green font-semibold shadow-lg whitespace-nowrap">
+                <span id="detection-label">Initializing...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status indicator -->
+          <div class="absolute bottom-3 right-3 bg-black/60 px-3 py-1 rounded-full text-xs text-neon-green">
+            CAM-01 • Live
+          </div>
+        </div>
+      </div>
+
+      <!-- Detection History -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-4">
+        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+          <i class="fas fa-history text-neon-green"></i>
+          Detection History •
+          <span id="history-count">0</span> Items
+        </h3>
+        <div id="detection-history" class="space-y-2 text-sm max-h-72 overflow-y-auto pr-1">
+          <p class="text-gray-500 text-center py-4">Detections will appear here...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Current Detection + Bin Monitoring -->
+    <div class="space-y-6">
+
+      <!-- Current Detection -->
+      <div class="bg-white rounded-2xl border border-neon-green/30 p-4 text-center">
+        <h3 class="text-lg font-semibold mb-4">Current Detection</h3>
+        <p id="det-item-name" class="text-2xl font-bold text-neon-green">Scanning...</p>
+        <p id="det-item-type" class="text-sm text-gray-400 mb-2">System Active</p>
+        <div class="mb-4">
+          <p class="text-sm text-gray-400">Confidence Level</p>
+          <div class="h-2 bg-gray-700 rounded-full overflow-hidden mt-1">
+            <div id="det-conf-bar" class="h-full bg-neon-green transition-all duration-200" style="width: 0%"></div>
+          </div>
+          <p id="det-conf-text" class="text-neon-green mt-1">0%</p>
+        </div>
+        <p class="text-sm">
+          Status: <span id="det-status" class="text-neon-green">Active</span> •
+          Action: <span id="det-action" class="text-warning-orange">Monitor</span>
+        </p>
+      </div>
+
+      <!-- Multi-Bin Monitoring -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-4">
+        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+          <i class="fas fa-trash-can text-neon-green"></i> Multi-Bin Monitoring
+        </h3>
+        <p class="text-sm text-gray-400 mb-4">Total Bins: 6 • Active: 5</p>
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-gray-400 border-b border-gray-200">
+              <th class="pb-2 text-left">Bin ID</th>
+              <th class="pb-2 text-left">Location</th>
+              <th class="pb-2 text-left">Fill</th>
+              <th class="pb-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody id="bin-table-body">
+            <tr class="border-b border-gray-800">
+              <td class="py-1.5">BIN-A12</td>
+              <td class="py-1.5">Downtown</td>
+              <td class="py-1.5">85%</td>
+              <td class="py-1.5 text-warning-orange">Warning</td>
+            </tr>
+            <tr class="border-b border-gray-800">
+              <td class="py-1.5">BIN-B03</td>
+              <td class="py-1.5">Park North</td>
+              <td class="py-1.5">42%</td>
+              <td class="py-1.5 text-neon-green">Normal</td>
+            </tr>
+            <tr class="border-b border-gray-800">
+              <td class="py-1.5">BIN-C07</td>
+              <td class="py-1.5">Market St</td>
+              <td class="py-1.5">97%</td>
+              <td class="py-1.5 text-error-red">Full</td>
+            </tr>
+            <tr class="border-b border-gray-800">
+              <td class="py-1.5">BIN-D15</td>
+              <td class="py-1.5">Station Rd</td>
+              <td class="py-1.5">20%</td>
+              <td class="py-1.5 text-neon-green">Normal</td>
+            </tr>
+            <tr class="border-b border-gray-800">
+              <td class="py-1.5">BIN-E22</td>
+              <td class="py-1.5">University</td>
+              <td class="py-1.5">61%</td>
+              <td class="py-1.5 text-neon-green">Normal</td>
+            </tr>
+            <tr>
+              <td class="py-1.5">BIN-F09</td>
+              <td class="py-1.5">Airport</td>
+              <td class="py-1.5">–</td>
+              <td class="py-1.5 text-gray-500">Offline</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- GPS Location Info Panel -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-4">
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+          <i class="fas fa-location-dot text-neon-green"></i> Device Location
+        </h3>
+        <div id="gps-info" class="text-sm text-gray-400 space-y-1">
+          <p>Acquiring GPS signal...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── CHARTS + MAP SECTION ── -->
+  <section class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Pie / Doughnut Chart -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-4">
+      <h3 class="text-lg font-semibold mb-4">Waste Category Distribution</h3>
+      <canvas id="pieChart" height="200"></canvas>
+    </div>
+
+    <!-- Bar Chart -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-4">
+      <h3 class="text-lg font-semibold mb-4">Top Waste Types Detected</h3>
+      <canvas id="barChart" height="200"></canvas>
+    </div>
+
+    <!-- GPS Leaflet Map -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-4 md:col-span-2">
+      <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+        <i class="fas fa-map-marked-alt text-neon-green"></i> GPS Live Map
+        <span id="gps-coords" class="text-sm font-normal text-gray-400 ml-2"></span>
+      </h3>
+      <div id="map"></div>
+      <div class="flex gap-3 mt-4">
+        <button id="btn-open-maps" onclick="openInMaps()"
+          class="px-4 py-2 bg-neon-green text-gray-900 font-semibold rounded-lg hover:bg-neon-dark transition-colors">
+          <i class="fas fa-external-link-alt mr-1"></i> Open in Google Maps
+        </button>
+        <button onclick="GPS.initMapWithLocation('map')"
+          class="px-4 py-2 border border-neon-green text-neon-green rounded-lg hover:bg-neon-green/10 transition-colors">
+          <i class="fas fa-sync mr-1"></i> Refresh Location
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer class="bg-gray-900/90 border-t border-gray-800 py-10 text-center text-gray-400">
+    <div class="max-w-7xl mx-auto px-4">
+      <p class="text-lg">MR.SmartUSEME © 2026</p>
+      <p class="mt-2">AI-Powered Waste Management • Cleaner Cities, Smarter Bins</p>
+    </div>
+  </footer>
+
+  <!-- ────────────────────────────────────────────────────── -->
+  <!--  SCRIPTS — load order matters:                        -->
+  <!--  1. Leaflet (map library)                             -->
+  <!--  2. gps.js (depends on Leaflet)                       -->
+  <!--  3. detection.js (depends on TF.js, DOM elements)     -->
+  <!--  4. Inline bootstrap + Chart.js charts                -->
+  <!-- ────────────────────────────────────────────────────── -->
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- GPS module -->
+  <script src="gps.js"></script>
+
+  <!-- Detection module -->
+  <script src="detection.js"></script>
+
+  <!-- Bootstrap + Charts inline -->
+  <script>
+    // ── Charts ──────────────────────────────────────────────
+    const pieChartData = {
+      labels: ['Recyclable', 'Trash', 'Hazardous'],
+      counts: [0, 0, 0]
+    };
+
+    let pieChart = new Chart(document.getElementById('pieChart'), {
+      type: 'doughnut',
+      data: {
+        labels: pieChartData.labels,
+        datasets: [{
+          data: pieChartData.counts,
+          backgroundColor: ['#00ff9d', '#6b7280', '#ef4444'],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { color: '#e5e7eb' } } }
+      }
+    });
+
+    let barChart = new Chart(document.getElementById('barChart'), {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Count',
+          data: [],
+          backgroundColor: '#10b981',
+          borderColor: '#059669',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true, ticks: { color: '#9ca3af' } },
+          x: { ticks: { color: '#9ca3af' } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // ── Detection history wiring ──────────────────────────
+    const historyContainer = document.getElementById('detection-history');
+    const historyCount = document.getElementById('history-count');
+    const statItems = document.getElementById('stat-items');
+    let totalDetections = 0;
+    const wasteTypeCounts = {};
+
+    const WASTE_ICONS = {
+      'Recyclable': 'fa-recycle text-neon-green',
+      'Trash': 'fa-trash text-gray-400',
+      'Hazardous': 'fa-biohazard text-error-red',
+      'Unclassified': 'fa-question text-gray-400',
+    };
+
+    // Listen for detections dispatched by detection.js
+    window.addEventListener('wasteDetected', (e) => {
+      const { className, type, percent, action } = e.detail;
+
+      totalDetections++;
+      statItems.innerText = totalDetections;
+      historyCount.innerText = totalDetections;
+
+      // Update waste type counts for charts
+      wasteTypeCounts[className] = (wasteTypeCounts[className] || 0) + 1;
+      updateCharts();
+
+      // Remove placeholder
+      const placeholder = historyContainer.querySelector('p');
+      if (placeholder) placeholder.remove();
+
+      // Create history row
+      const iconClass = WASTE_ICONS[type] || 'fa-question text-gray-400';
+      const now = new Date().toLocaleTimeString();
+      const row = document.createElement('div');
+      row.className = 'flex justify-between items-center bg-gray-800/50 p-3 rounded-lg history-item-enter';
+      row.innerHTML = `
+        <div class="flex items-center gap-2">
+          <i class="fas ${iconClass}"></i>
+          <span class="font-medium">${className}</span>
+          <span class="text-gray-400">• ${type}</span>
+        </div>
+        <div class="text-right">
+          <span class="text-neon-green">${percent}%</span>
+          <span class="text-gray-500 ml-2 text-xs">${now}</span>
+        </div>`;
+
+      // Prepend (newest first), limit to 50
+      historyContainer.prepend(row);
+      const rows = historyContainer.querySelectorAll('div');
+      if (rows.length > 50) rows[rows.length - 1].remove();
+    });
+
+    function updateCharts() {
+      // Bar chart: top 7 waste types sorted by count
+      const sorted = Object.entries(wasteTypeCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 7);
+
+      barChart.data.labels = sorted.map(([k]) => k);
+      barChart.data.datasets[0].data = sorted.map(([, v]) => v);
+      barChart.update('none');
+
+      // Pie chart: breakdown by high-level category
+      const catMap = { Recyclable: 0, Trash: 0, Hazardous: 0 };
+      Object.entries(wasteTypeCounts).forEach(([cls, cnt]) => {
+        if (window.WASTE_TYPES && window.WASTE_TYPES[cls]) {
+          const cat = window.WASTE_TYPES[cls].type;
+          if (cat in catMap) catMap[cat] += cnt;
+        }
+      });
+      pieChart.data.datasets[0].data = Object.values(catMap);
+      pieChart.update('none');
+    }
+
+    // ── GPS init ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      GPS.initMapWithLocation('map', { zoom: 15, markerText: 'Bin Location' });
+
+      // Update small GPS coords label
+      GPS.getCurrentLocation(
+        (pos) => {
+          document.getElementById('gps-coords').innerText =
+            `${pos.latitude.toFixed(5)}°N, ${pos.longitude.toFixed(5)}°E`;
+          document.getElementById('gps-info').innerHTML = `
+            <p><span class="text-gray-300">Latitude:</span> ${pos.latitude.toFixed(6)}°</p>
+            <p><span class="text-gray-300">Longitude:</span> ${pos.longitude.toFixed(6)}°</p>
+            <p><span class="text-gray-300">Accuracy:</span> ±${pos.accuracy.toFixed(0)} m</p>
+            <p><span class="text-gray-300">Updated:</span> ${pos.timestamp}</p>`;
+          // Setup open-in-maps button
+          document.getElementById('btn-open-maps').onclick = () =>
+            window.open(`https://www.google.com/maps?q=${pos.latitude},${pos.longitude}`, '_blank');
+        },
+        (err) => {
+          document.getElementById('gps-info').innerHTML =
+            `<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-1"></i>${err}</p>`;
+        }
+      );
+
+      // Watch for live location updates
+      GPS.startWatchingLocation(
+        (pos) => {
+          document.getElementById('gps-coords').innerText =
+            `${pos.latitude.toFixed(5)}°N, ${pos.longitude.toFixed(5)}°E`;
+        },
+        (err) => console.warn('GPS watch error:', err)
+      );
+    });
+
+    function openInMaps() {
+      GPS.getCurrentLocation(
+        (pos) => window.open(`https://www.google.com/maps?q=${pos.latitude},${pos.longitude}`, '_blank'),
+        () => alert('Could not get location. Please allow GPS access.')
+      );
+    }
+  </script>
+
+</body>
+
+</html>
