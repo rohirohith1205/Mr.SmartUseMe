@@ -61,10 +61,10 @@
   </style>
 </head>
 
-<body class="bg-gray-950 text-gray-100 font-sans antialiased">
+<body class="bg-gray-100 text-gray-900 font-sans antialiased">
 
   <!-- ── HEADER ── -->
-  <header class="bg-gray-900/80 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
+  <header class="bg-white backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="text-2xl font-bold text-neon-green flex items-center gap-2">
@@ -116,16 +116,28 @@
     <div class="lg:col-span-2 space-y-6">
 
       <!-- Live Camera Feed -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 overflow-hidden">
-        <div class="bg-gray-800 px-4 py-2 flex items-center justify-between text-sm">
-          <div class="flex items-center gap-2">
-            <span class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
-            Live Camera Feed • REC
-          </div>
-          <div class="text-gray-400" id="cam-info">Initializing camera... • Camera ID: CAM-01</div>
+            <div class="bg-gray-100 px-4 py-2 flex items-center justify-between text-sm border-b border-gray-200">
+        <div class="flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+          Live Camera Feed
         </div>
-        <div class="aspect-video bg-gray-950 relative overflow-hidden">
-          <video id="live-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+
+        <div class="flex items-center gap-3">
+          <div class="text-gray-500" id="cam-info">Camera idle • Camera ID: CAM-01</div>
+
+          <button
+            onclick="startDetection()"
+            class="px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition">
+            Start
+          </button>
+
+          <button
+            onclick="stopCamera()"
+            class="px-3 py-1 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition">
+            Stop
+          </button>
+        </div>
+    </div>
 
           <!-- Bounding box overlay -->
           <div class="absolute inset-0 pointer-events-none" id="overlay-container">
@@ -133,7 +145,7 @@
             <div id="detection-box"
               class="hidden absolute border-4 border-dashed border-neon-green/70 rounded-xl transition-all duration-75 ease-out">
               <div id="detection-label-box"
-                class="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900/80 px-5 py-2 rounded-full text-neon-green font-semibold shadow-lg whitespace-nowrap">
+                class="absolute -top-8 left-1/2 -translate-x-1/2 bg-white px-5 py-2 rounded-full text-neon-green font-semibold shadow-lg whitespace-nowrap">
                 <span id="detection-label">Initializing...</span>
               </div>
             </div>
@@ -147,7 +159,7 @@
       </div>
 
       <!-- Detection History -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
+      <div class="bg-white rounded-2xl border border-gray-200 p-4">
         <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
           <i class="fas fa-history text-neon-green"></i>
           Detection History •
@@ -163,7 +175,7 @@
     <div class="space-y-6">
 
       <!-- Current Detection -->
-      <div class="bg-gray-900/70 rounded-2xl border border-neon-green/30 p-4 text-center">
+      <div class="bg-white rounded-2xl border border-neon-green/30 p-4 text-center">
         <h3 class="text-lg font-semibold mb-4">Current Detection</h3>
         <p id="det-item-name" class="text-2xl font-bold text-neon-green">Scanning...</p>
         <p id="det-item-type" class="text-sm text-gray-400 mb-2">System Active</p>
@@ -181,14 +193,14 @@
       </div>
 
       <!-- Multi-Bin Monitoring -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
+      <div class="bg-white rounded-2xl border border-gray-200 p-4">
         <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
           <i class="fas fa-trash-can text-neon-green"></i> Multi-Bin Monitoring
         </h3>
         <p class="text-sm text-gray-400 mb-4">Total Bins: 6 • Active: 5</p>
         <table class="w-full text-xs">
           <thead>
-            <tr class="text-gray-400 border-b border-gray-700">
+            <tr class="text-gray-400 border-b border-gray-200">
               <th class="pb-2 text-left">Bin ID</th>
               <th class="pb-2 text-left">Location</th>
               <th class="pb-2 text-left">Fill</th>
@@ -237,7 +249,7 @@
       </div>
 
       <!-- GPS Location Info Panel -->
-      <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
+      <div class="bg-white rounded-2xl border border-gray-200 p-4">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
           <i class="fas fa-location-dot text-neon-green"></i> Device Location
         </h3>
@@ -252,19 +264,19 @@
   <section class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
 
     <!-- Pie / Doughnut Chart -->
-    <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
+    <div class="bg-white rounded-2xl border border-gray-200 p-4">
       <h3 class="text-lg font-semibold mb-4">Waste Category Distribution</h3>
       <canvas id="pieChart" height="200"></canvas>
     </div>
 
     <!-- Bar Chart -->
-    <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4">
+    <div class="bg-white rounded-2xl border border-gray-200 p-4">
       <h3 class="text-lg font-semibold mb-4">Top Waste Types Detected</h3>
       <canvas id="barChart" height="200"></canvas>
     </div>
 
     <!-- GPS Leaflet Map -->
-    <div class="bg-gray-900/70 rounded-2xl border border-gray-700 p-4 md:col-span-2">
+    <div class="bg-white rounded-2xl border border-gray-200 p-4 md:col-span-2">
       <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
         <i class="fas fa-map-marked-alt text-neon-green"></i> GPS Live Map
         <span id="gps-coords" class="text-sm font-normal text-gray-400 ml-2"></span>

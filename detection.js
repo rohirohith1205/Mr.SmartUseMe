@@ -56,6 +56,8 @@ let consecutiveErrors = 0;
 let fpsInterval = null;
 let frameCount = 0;
 let lastFpsTime = performance.now();
+let streamRef = null;
+let isCameraRunning = false;
 
 // ── Initialization ────────────────────────────────────────────
 async function init() {
@@ -63,15 +65,67 @@ async function init() {
     detItemName.innerText = 'Starting camera...';
 
     // 1. Start camera
-    try {
-        await setupCamera();
-    } catch (e) {
-        detItemName.innerText = 'Camera Error';
-        detItemType.innerText = 'Check browser permissions';
-        updateStatus('Camera Failed');
-        console.error('[Detection] Camera setup failed:', e);
-        return;
+   async function setupCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera API not supported in this browser');
     }
+
+    streamRef = await navigator.mediaDevices.getUserMedia({
+        video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'environment'
+        },
+        audio: false
+    });
+
+    video.srcObject = streamRef;
+    isCameraRunning = true;
+
+    return new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+            video.play().catch(err => console.warn('[Detection] Video play error:', err));
+
+            const camInfo = document.getElementById('cam-info');
+            if (camInfo) {
+                camInfo.innerText = `Resolution: ${video.videoWidth}×${video.videoHeight} • Camera ID: CAM-01`;
+            }
+
+            resolve();
+        };
+    });
+}
+
+async function startDetection() {
+    if (isCameraRunning) return;
+    await init();
+}
+
+function stopCamera() {
+    if (streamRef) {
+        streamRef.getTracks().forEach(track => track.stop());
+        streamRef = null;
+    }
+
+    video.srcObject = null;
+    isCameraRunning = false;
+    backendOK = false;
+
+    if (fpsInterval) {
+        clearInterval(fpsInterval);
+        fpsInterval = null;
+    }
+
+    hideOverlay();
+    updateStatus('Stopped');
+    detItemName.innerText = 'Camera Stopped';
+    detItemType.innerText = 'Click Start Detection';
+
+    const camInfo = document.getElementById('cam-info');
+    if (camInfo) {
+        camInfo.innerText = 'Camera stopped • Camera ID: CAM-01';
+    }
+}
 
     // 2. Check backend health
     updateStatus('Checking AI backend...');
@@ -317,4 +371,6 @@ function updateStatus(text) {
 }
 
 // ── Start ─────────────────────────────────────────────────────
-init();
+updateStatus('Idle');
+detItemName.innerText = 'Click Start Detection';
+detItemType.innerText = 'Waiting';
