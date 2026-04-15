@@ -75,23 +75,46 @@
         </div>
       </div>
     </section>
-
-    <section class="grid md:grid-cols-2 gap-6">
-      <div class="rounded-3xl border border-white/10 bg-white/5 p-6">
-        <h3 class="font-display text-xl mb-4">Category Analytics</h3>
-        <canvas id="pieChart"></canvas>
+<section class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+  <!-- Category Analytics -->
+  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+    <h3 class="text-lg font-semibold mb-4">Category Analytics</h3>
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="rounded-xl bg-emerald-100 dark:bg-emerald-900/30 p-3 text-center">
+        <p class="text-xs">Recyclable</p>
+        <p id="recyclable-count" class="font-bold text-lg">0</p>
       </div>
-      <div class="rounded-3xl border border-white/10 bg-white/5 p-6">
-        <h3 class="font-display text-xl mb-4">Top Waste Types</h3>
-        <canvas id="barChart"></canvas>
+      <div class="rounded-xl bg-red-100 dark:bg-red-900/30 p-3 text-center">
+        <p class="text-xs">Hazardous</p>
+        <p id="hazardous-count" class="font-bold text-lg">0</p>
       </div>
-    </section>
+      <div class="rounded-xl bg-slate-100 dark:bg-slate-800 p-3 text-center">
+        <p class="text-xs">Trash</p>
+        <p id="trash-count" class="font-bold text-lg">0</p>
+      </div>
+    </div>
+    <canvas id="pieChart" height="200"></canvas>
+  </div>
 
-    <section class="rounded-3xl border border-white/10 bg-white/5 p-6">
-      <h3 class="font-display text-xl mb-4">GPS Smart Bin Map</h3>
-      <div id="map" class="h-96 rounded-2xl bg-zinc-900"></div>
-    </section>
+  <!-- Top Waste Types -->
+  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+    <h3 class="text-lg font-semibold mb-4">Top Waste Types</h3>
+    <canvas id="barChart" height="200"></canvas>
+    <div id="top-waste-list" class="mt-4 space-y-2"></div>
+  </div>
+
+  <!-- GPS Smart Bin Map -->
+  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 md:col-span-2">
+    <h3 class="text-lg font-semibold mb-4">GPS Smart Bin Map</h3>
+    <div id="map" style="height:320px;border-radius:16px"></div>
+  </div>
+</section>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="gps.js"></script>
+  <script src="detection.js"></script>
+
   <script>
     function toggleTheme() {
       const body = document.body;
@@ -101,22 +124,157 @@
       body.classList.toggle('text-zinc-900');
     }
 
-    // expose existing detection controls from detection.js
-    window.startDetection = window.startDetection || function () {
-      if (typeof startDetection === 'function') startDetection();
-    };
-
-    window.stopCamera = window.stopCamera || function () {
-      if (typeof stopCamera === 'function') stopCamera();
-    };
-
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  </script>
 
-  <!-- keep your existing project scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="gps.js"></script>
-  <script src="detection.js"></script>
+    // ── Analytics State ───────────────────────────────────
+    let wasteTypeCounts = {};
+    let categoryStats = { Recyclable: 0, Hazardous: 0, Trash: 0 };
+    let detectionHistory = [];
+
+    // ── Initialize Charts ─────────────────────────────────
+    const pieCtx = document.getElementById('pieChart');
+    const barCtx = document.getElementById('barChart');
+
+    let pieChart = null;
+    let barChart = null;
+
+    if (pieCtx) {
+      pieChart = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Recyclable', 'Hazardous', 'Trash'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['#00ff9d', '#ef4444', '#6b7280'],
+            borderColor: '#1f2937',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#9ca3af', font: { size: 12 } }
+            }
+          }
+        }
+      });
+    }
+
+    if (barCtx) {
+      barChart = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Detections',
+            data: [],
+            backgroundColor: '#10b981',
+            borderColor: '#059669',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          indexAxis: 'y',
+          scales: {
+            x: { beginAtZero: true, ticks: { color: '#9ca3af' } },
+            y: { ticks: { color: '#9ca3af' } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // ── Listen for Waste Detections ───────────────────────
+    window.addEventListener('wasteDetected', (e) => {
+      const { className, type, percent, action, timestamp } = e.detail;
+
+      // Update category counts
+      categoryStats[type] = (categoryStats[type] || 0) + 1;
+      document.getElementById('recyclable-count').innerText = categoryStats.Recyclable;
+      document.getElementById('hazardous-count').innerText = categoryStats.Hazardous;
+      document.getElementById('trash-count').innerText = categoryStats.Trash;
+
+      // Update waste type counts
+      wasteTypeCounts[className] = (wasteTypeCounts[className] || 0) + 1;
+
+      // Add to detection history
+      detectionHistory.unshift({
+        className,
+        type,
+        percent,
+        action,
+        timestamp: new Date(timestamp).toLocaleTimeString()
+      });
+
+      // Keep only last 20 in memory
+      if (detectionHistory.length > 20) detectionHistory.pop();
+
+      // Render history
+      updateDetectionHistory();
+
+      // Update charts
+      updateCharts();
+    });
+
+    function updateDetectionHistory() {
+      const historyEl = document.getElementById('detection-history');
+      const placeholder = historyEl.querySelector('p');
+      
+      if (detectionHistory.length > 0 && placeholder) {
+        placeholder.remove();
+      }
+
+      // Show latest 10 detections
+      historyEl.innerHTML = detectionHistory.slice(0, 10).map(d => `
+        <div class="flex justify-between items-center bg-gray-800/30 dark:bg-gray-700/30 p-3 rounded-lg text-sm">
+          <div>
+            <span class="font-semibold text-emerald-400">${d.className}</span>
+            <span class="text-gray-500 ml-2">${d.type}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-emerald-400">${d.percent}%</span>
+            <span class="text-gray-500 ml-2 text-xs">${d.timestamp}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateCharts() {
+      if (!pieChart || !barChart) return;
+
+      // Update pie chart with category totals
+      pieChart.data.datasets[0].data = [
+        categoryStats.Recyclable,
+        categoryStats.Hazardous,
+        categoryStats.Trash
+      ];
+      pieChart.update('none');
+
+      // Update bar chart with top waste types
+      const sorted = Object.entries(wasteTypeCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+
+      barChart.data.labels = sorted.map(([name]) => name);
+      barChart.data.datasets[0].data = sorted.map(([, count]) => count);
+      barChart.update('none');
+
+      // Update top waste list beneath bar chart
+      const listEl = document.getElementById('top-waste-list');
+      if (listEl) {
+        listEl.innerHTML = sorted.map(([name, count]) => `
+          <div class="flex justify-between text-sm p-2 rounded bg-gray-800/20 dark:bg-gray-700/20">
+            <span>${name}</span>
+            <span class="font-semibold text-emerald-400">${count}</span>
+          </div>
+        `).join('');
+      }
+    }
+  </script>
 </body>
 </html>
