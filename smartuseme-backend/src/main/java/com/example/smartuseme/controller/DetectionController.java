@@ -13,9 +13,21 @@ public class DetectionController {
     public DetectionController(DetectionService detectionService) {
         this.detectionService = detectionService;
     }
+    
+    @GetMapping("/health")
+    public String health() {
+        return "SmartUSEME backend running";
+    }
 
     @PostMapping("/detect")
     public String detect(@RequestParam("file") MultipartFile file) throws Exception {
         return detectionService.detectGarbage(file);
     }
+
+    @GetMapping("/python-health")
+public String pythonHealth() {
+    return detectionService.checkPythonHealth();
+    }
+
 }
+
